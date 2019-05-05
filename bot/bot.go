@@ -1,8 +1,8 @@
 package bot
 
 import (
+	"github.com/bigspawn/music-news/parser"
 	"github.com/go-telegram-bot-api/telegram-bot-api"
-	"github.com/mmcdole/gofeed"
 	"golang.org/x/net/proxy"
 	"log"
 	"net/http"
@@ -10,16 +10,19 @@ import (
 
 func Create(user, password, address, token string) (*tgbotapi.BotAPI, error) {
 	dialer, err := proxy.SOCKS5("tcp", address, &proxy.Auth{User: user, Password: password}, proxy.Direct)
-	handleError(err)
+	if err != nil {
+		log.Fatalf("[ERROR] Error %s", err)
+	}
 	client := &http.Client{Transport: &http.Transport{Dial: dialer.Dial}}
 	bot, err := tgbotapi.NewBotAPIWithClient(token, client)
 	return bot, err
 }
 
-func SendNews(chatId int64, message string, news *gofeed.Item, bot *tgbotapi.BotAPI) bool {
-	msg := tgbotapi.NewMessage(chatId, message)
-	buttonURL := tgbotapi.NewInlineKeyboardButtonURL("Site", news.Link)
-	markup := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(buttonURL))
+func SendNews(chatId int64, news parser.News, bot *tgbotapi.BotAPI) bool {
+	pageButton := tgbotapi.NewInlineKeyboardButtonURL("Site page", news.PageLink)
+	downloadButton := tgbotapi.NewInlineKeyboardButtonURL("Download", news.DownloadLink[0])
+	markup := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(pageButton, downloadButton))
+	msg := tgbotapi.NewMessage(chatId, news.Text)
 	msg.ReplyMarkup = markup
 	_, err := bot.Send(msg)
 	if err != nil {
@@ -29,18 +32,12 @@ func SendNews(chatId int64, message string, news *gofeed.Item, bot *tgbotapi.Bot
 	return true
 }
 
-func SendImage(chatId int64, src string, bot *tgbotapi.BotAPI) bool {
-	image := tgbotapi.NewPhotoShare(chatId, src)
+func SendImage(chatId int64, news parser.News, bot *tgbotapi.BotAPI) bool {
+	image := tgbotapi.NewPhotoShare(chatId, news.ImageLink)
 	_, err := bot.Send(image)
 	if err != nil {
 		log.Println(err)
 		return false
 	}
 	return true
-}
-
-func handleError(err error) {
-	if err != nil {
-		log.Fatalf("[ERROR] Error %s", err)
-	}
 }
