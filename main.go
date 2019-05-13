@@ -18,7 +18,7 @@ const (
 	feedUrl         = "https://kingdom-leaks.com/index.php?/rss/3-the-kingdom-leaks-homepage-feed.xml"
 	address         = "test.bigspawn.com:1080"
 	dbUrlDev        = "postgres://go-music:mysecretpassword@localhost:8532/postgres?sslmode=disable"
-	dbUrl           = "postgres://postgres:xxQWV2EkIUjzcyeag27AqTiNBjiupob8PHU@test.bigspawn.com:15432/music?sslmode=disable"
+	dbUrl           = "postgres://postgres:xxQWV2EkIUjzcyeag27AqTiNBjiupob8PHU@test.bigspawn.com:15432/postgres?sslmode=disable"
 )
 
 func main() {
@@ -27,9 +27,9 @@ func main() {
 		log.Fatalf("[ERROR] Error %v", err)
 	}
 	gocron.Every(10).Minutes().Do(parse, bot)
-	//gocron.RunAll()
+	gocron.RunAll()
 	_, time := gocron.NextRun()
-	log.Println(time)
+	log.Printf("[INFO] Next start [%v]", time)
 	<-gocron.Start()
 }
 
@@ -41,8 +41,9 @@ func parse(bot *tgbotapi.BotAPI) {
 		log.Fatalf("[ERROR] Error %v", err)
 	}
 	for _, n := range news {
-		botWrap.SendImage(chatID, n, bot)
-		botWrap.SendNews(chatID, n, bot)
-		log.Printf("[INFO] Item was send [%v]", n)
+		if wasSend := botWrap.SendImage(chatID, n, bot); wasSend {
+			botWrap.SendNews(chatID, n, bot)
+			log.Printf("[INFO] Item was send [%v]", n.Title)
+		}
 	}
 }
