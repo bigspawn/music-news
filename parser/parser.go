@@ -1,7 +1,9 @@
 package parser
 
 import (
+	"database/sql"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/bigspawn/music-news/db"
 	"github.com/mmcdole/gofeed"
 	"log"
 	"net/http"
@@ -11,31 +13,30 @@ import (
 	"unicode/utf8"
 )
 
-const divSelector = "div.ipsType_normal.ipsType_richText.ipsContained[data-role=commentContent][data-controller=core.front.core.lightboxedImages]"
-
 var excludeWords = []string{"Leaked\n"}
 var excludeLastWords = []string{"Download\n", "Downloads\n", "Total length:"}
 var excludeGenders = []string{"pop", "rap", "folk", "synthpop", "r&b", "thrash metal", "J-Core", "R&amp;B"}
 
-type News struct {
-	ID           int
-	Text         string
-	ImageLink    string
-	DownloadLink []string
-	PageLink     string
-}
-
-func Parse(feedUrl string) ([]News, error) {
+func Parse(feedUrl string, connection *sql.DB) ([]db.News, error) {
 	feedParser := gofeed.NewParser()
 	feed, err := feedParser.ParseURL(feedUrl)
 	if err != nil {
 		log.Fatalf("[ERROR] Parsing site : %s", err)
 	}
-	var news []News
+	var news []db.News
 	for _, item := range feed.Items {
 		if item != nil {
-			log.Printf("[INFO] %s : %s", item.Title, item.Link)
-			var n News
+			row, err := db.Select(connection, item.Title)
+			if err != nil {
+				log.Printf("[ERROR] Error %v", err)
+				continue
+			}
+			if row != nil && row.Next() {
+				log.Printf("[INFO] Skip news [%s], it contains in DB", item.Title)
+				continue
+			}
+
+			log.Printf("[INFO] Parse news [%s: %s]", item.Title, item.Link)
 			regExp, err := regexp.Compile("\n{2,}|\\s{2,}")
 			if err != nil {
 				log.Printf("[ERROR] Regexp error: %s", err)
@@ -57,7 +58,7 @@ func Parse(feedUrl string) ([]News, error) {
 				continue
 			}
 			if containText(description, excludeGenders) {
-				log.Printf("[DEBUG] Exclude item %s : %s", item.Title, item.Link)
+				log.Printf("[DEBUG] Exclude item [%s: %s]", item.Title, item.Link)
 				continue
 			}
 
@@ -74,29 +75,29 @@ func Parse(feedUrl string) ([]News, error) {
 				continue
 			}
 
+			var n db.News
+			n.DateTime = item.PublishedParsed
+
 			articleDiv := doc.Find("div.ipsType_normal.ipsType_richText.ipsContained").First()
 			link := articleDiv.Find("a[rel~='external']").First()
 			if val, exists := link.Attr("href"); exists {
-				log.Printf("[INFO] link %s", val)
+				log.Printf("[INFO] Download link [%s]", val)
 				n.DownloadLink = append(n.DownloadLink, val)
 			} else {
 				continue
 			}
 
-			//if downloadLink, exists := first.Attr("href"); exists {
-			//	n.DownloadLink = append(n.DownloadLink, downloadLink)
-			//} else {
-			//	continue
-			//}
-
 			imageLink := document.Find("img.ipsImage").First()
 			if link, exist := imageLink.Attr("src"); exist {
 				n.ImageLink = link
-				n.Text = item.Title + "\n" + normalize(description)
+				n.Text = normalize(description)
 				n.PageLink = item.Link
+				n.Title = item.Title
 			} else {
 				continue
 			}
+
+			db.Insert(connection, n)
 			news = append(news, n)
 		}
 	}
@@ -112,8 +113,8 @@ func normalize(description string) string {
 	}
 	for _, word := range excludeWords {
 		index := strings.Index(description, word)
-		if index > 0 {
-			description = description[index : index+utf8.RuneCountInString(word)]
+		if index > -1 {
+			description = description[:index] + description[index+utf8.RuneCountInString(word):]
 		}
 	}
 	return description
