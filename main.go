@@ -38,7 +38,8 @@ func parse(bot *tgbotapi.BotAPI) {
 	defer con.Close()
 	news, err := parser.Parse(feedUrl, con)
 	if err != nil {
-		log.Fatalf("[ERROR] Error %v", err)
+		log.Printf("[ERROR] Error %v. Waiting for next execution", err)
+		return
 	}
 	for _, n := range news {
 		if wasSend := botWrap.SendImage(chatID, n, bot); wasSend {

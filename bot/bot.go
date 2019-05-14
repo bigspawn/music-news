@@ -11,7 +11,8 @@ import (
 func Create(user, password, address, token string) (*tgbotapi.BotAPI, error) {
 	dialer, err := proxy.SOCKS5("tcp", address, &proxy.Auth{User: user, Password: password}, proxy.Direct)
 	if err != nil {
-		log.Fatalf("[ERROR] Error %v", err)
+		log.Printf("[ERROR] Error %v", err)
+		return nil, err
 	}
 	client := &http.Client{Transport: &http.Transport{Dial: dialer.Dial}}
 	bot, err := tgbotapi.NewBotAPIWithClient(token, client)

@@ -18,12 +18,12 @@ var excludeLastWords = []string{"Download\n", "Downloads\n", "Total length:"}
 var excludeGenders = []string{"pop", "rap", "folk", "synthpop", "r&b", "thrash metal", "J-Core", "R&amp;B"}
 
 func Parse(feedUrl string, connection *sql.DB) ([]db.News, error) {
+	var news []db.News
 	feedParser := gofeed.NewParser()
 	feed, err := feedParser.ParseURL(feedUrl)
 	if err != nil {
-		log.Fatalf("[ERROR] Parsing site : %s", err)
+		return news, err
 	}
-	var news []db.News
 	for _, item := range feed.Items {
 		if item != nil {
 			row, err := db.Select(connection, item.Title)

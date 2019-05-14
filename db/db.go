@@ -26,10 +26,10 @@ func Connection(connStr string) *sql.DB {
 }
 
 func Select(db *sql.DB, title string) (*sql.Rows, error) {
-	return db.Query("SELECT * from public.news where title like '%" + title + "%'")
+	return db.Query("SELECT * FROM public.news WHERE title LIKE '%' || $1 || '%'", title)
 }
 
 func Insert(db *sql.DB, n News) {
-	db.QueryRow(`INSERT INTO public.news(title, playlist, date_time, imageurl, downloadurl)
-						VALUES($1, $2, $3, $4, $5)`, n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0])
+	db.QueryRow("INSERT INTO public.news(title, playlist, date_time, imageurl, downloadurl) VALUES ($1, $2, $3, $4, $5)",
+		n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0])
 }
