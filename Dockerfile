@@ -1,8 +1,13 @@
-FROM golang:1.11.5
-
-RUN mkdir /app
-COPY music-news /app/
-RUN chmod +x /app/music-news
+# Multi-stage docker build file
+# Build go app
+FROM golang:alpine
+ADD . /app
 WORKDIR /app
+ENV GOFLAGS="-mod=vendor"
+RUN go build -o music-news
 
+# Build container
+FROM golang:alpine
+WORKDIR /app
+COPY --from=0 /app/music-news .
 CMD ["./music-news"]

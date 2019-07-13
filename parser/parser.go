@@ -37,7 +37,7 @@ func Parse(feedUrl string, connection *sql.DB) ([]db.News, error) {
 			}
 
 			log.Printf("[INFO] Parse news [%s: %s]", item.Title, item.Link)
-			regExp, err := regexp.Compile("\n{2,}|\\s{2,}")
+			regExp, err := regexp.Compile("\\n{2,}|\\s{2,}")
 			if err != nil {
 				log.Printf("[ERROR] Regexp error: %s", err)
 				continue
@@ -97,7 +97,8 @@ func Parse(feedUrl string, connection *sql.DB) ([]db.News, error) {
 				continue
 			}
 
-			db.Insert(connection, n)
+			var rowDb = db.Insert(connection, n)
+			log.Printf("[INFO] Insert [%v]", rowDb)
 			news = append(news, n)
 		}
 	}

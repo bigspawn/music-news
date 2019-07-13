@@ -1,49 +1,59 @@
 package main
 
 import (
+	"log"
+	"os"
+
 	botWrap "github.com/bigspawn/music-news/bot"
 	"github.com/bigspawn/music-news/db"
 	"github.com/bigspawn/music-news/parser"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/jasonlvhit/gocron"
-	"log"
+	"github.com/jessevdk/go-flags"
 )
 
-const (
-	user            = "bigspawn"
-	passwd          = "BxYxvmFrohdDwsRjuUjAKXjPRwUvEpmB"
-	botID           = "417691036:AAHaptah5zlg5GpRvHkWka_680ZL3_7MKhw"
-	chatID    int64 = -1001112604760
-	chatIDDev int64 = -1001086871152
-	feedUrl         = "https://kingdom-leaks.com/index.php?/rss/3-the-kingdom-leaks-homepage-feed.xml"
-	address         = "test.bigspawn.com:1080"
-	dbUrlDev        = "postgres://go-music:mysecretpassword@localhost:8532/postgres?sslmode=disable"
-	dbUrl           = "postgres://postgres:xxQWV2EkIUjzcyeag27AqTiNBjiupob8PHU@test.bigspawn.com:15432/postgres?sslmode=disable"
-)
+type EnvParams struct {
+	User     string `long:"user" env:"USER" required:"true"`
+	Passwd   string `long:"passwd" env:"PASSWD" required:"true"`
+	BotID    string `long:"bot_id" env:"BOT_ID" required:"true"`
+	ChatID   int64  `long:"chat_id" env:"CHAT_ID" required:"true"`
+	FeedURL  string `long:"feed_url" env:"FEED_URL" required:"true"`
+	ProxyURL string `long:"proxy_url" env:"PROXY_URL" required:"true"`
+	DbURL    string `long:"db_url" env:"DB_URL" required:"true"`
+}
 
 func main() {
-	bot, err := botWrap.Create(user, passwd, address, botID)
-	if err != nil {
-		log.Fatalf("[ERROR] Error %v", err)
+
+	var params EnvParams
+	p := flags.NewParser(&params, flags.Default)
+	if _, err := p.Parse(); err != nil {
+		os.Exit(0)
 	}
-	gocron.Every(10).Minutes().Do(parse, bot)
+
+	log.Printf("[DEBUG] %v", params)
+
+	bot, err := botWrap.Create(params.User, params.Passwd, params.ProxyURL, params.BotID)
+	if err != nil {
+		log.Fatalf("[ERROR] Error %e", err)
+	}
+	gocron.Every(10).Minutes().Do(parse, bot, params)
 	gocron.RunAll()
 	_, time := gocron.NextRun()
 	log.Printf("[INFO] Next start [%v]", time)
 	<-gocron.Start()
 }
 
-func parse(bot *tgbotapi.BotAPI) {
-	con := db.Connection(dbUrl)
+func parse(bot *tgbotapi.BotAPI, params EnvParams) {
+	con := db.Connection(params.DbURL)
 	defer con.Close()
-	news, err := parser.Parse(feedUrl, con)
+	news, err := parser.Parse(params.FeedURL, con)
 	if err != nil {
 		log.Printf("[ERROR] Error %v. Waiting for next execution", err)
 		return
 	}
 	for _, n := range news {
-		if wasSend := botWrap.SendImage(chatID, n, bot); wasSend {
-			botWrap.SendNews(chatID, n, bot)
+		if wasSend := botWrap.SendImage(params.ChatID, n, bot); wasSend {
+			botWrap.SendNews(params.ChatID, n, bot)
 			log.Printf("[INFO] Item was send [%v]", n.Title)
 		}
 	}
