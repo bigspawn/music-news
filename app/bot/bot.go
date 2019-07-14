@@ -1,0 +1,51 @@
+package bot
+
+import (
+	"github.com/bigspawn/music-news/db"
+	"github.com/go-telegram-bot-api/telegram-bot-api"
+	"golang.org/x/net/proxy"
+	"log"
+	"net/http"
+)
+
+func Create(user, password, address, token string) (*tgbotapi.BotAPI, error) {
+	dialer, err := proxy.SOCKS5("tcp", address, &proxy.Auth{User: user, Password: password}, proxy.Direct)
+	if err != nil {
+		log.Printf("[ERROR] Error %v", err)
+		return nil, err
+	}
+	client := &http.Client{Transport: &http.Transport{Dial: dialer.Dial}}
+	bot, err := tgbotapi.NewBotAPIWithClient(token, client)
+	return bot, err
+}
+
+func CreateWithToken(token string) (*tgbotapi.BotAPI, error) {
+	bot, err := tgbotapi.NewBotAPI(token)
+	return bot, err
+}
+
+func SendNews(chatId int64, news db.News, bot *tgbotapi.BotAPI) bool {
+	log.Printf("[INFO] send news in chat %d, %v", chatId, news)
+	pageButton := tgbotapi.NewInlineKeyboardButtonURL("Site page", news.PageLink)
+	downloadButton := tgbotapi.NewInlineKeyboardButtonURL("Download", news.DownloadLink[0])
+	markup := tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(pageButton, downloadButton))
+	msg := tgbotapi.NewMessage(chatId, news.Title+"\n"+news.Text)
+	msg.ReplyMarkup = markup
+	_, err := bot.Send(msg)
+	if err != nil {
+		log.Printf("[ERROR] Error %v", err)
+		return false
+	}
+	return true
+}
+
+func SendImage(chatId int64, news db.News, bot *tgbotapi.BotAPI) bool {
+	log.Printf("[INFO] send image in chat %d, %v", chatId, news)
+	image := tgbotapi.NewPhotoShare(chatId, news.ImageLink)
+	_, err := bot.Send(image)
+	if err != nil {
+		log.Printf("[ERROR] Error %v", err)
+		return false
+	}
+	return true
+}

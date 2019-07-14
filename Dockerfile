@@ -1,10 +1,10 @@
 # Multi-stage docker build file
 # Build go app
 FROM golang:alpine
-ADD . /app
+ADD app /app
 WORKDIR /app
 ENV GOFLAGS="-mod=vendor"
-RUN go build -o music-news
+RUN go build -o music-news .
 
 # Build container
 FROM golang:alpine
