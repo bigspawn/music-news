@@ -17,3 +17,4 @@
 
 docker-compose-dev.yml
 docker-compose-prod.yml
+sql/postgres_public_news_dump.sql
