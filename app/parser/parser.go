@@ -37,11 +37,7 @@ func Parse(feedUrl string, connection *sql.DB) ([]db.News, error) {
 			}
 
 			log.Printf("[INFO] Parse news [%s: %s]", item.Title, item.Link)
-			regExp, err := regexp.Compile("\\n{2,}|\\s{2,}")
-			if err != nil {
-				log.Printf("[ERROR] Regexp error: %s", err)
-				continue
-			}
+
 			response, err := http.Get(item.Link)
 			if err != nil {
 				log.Printf("[ERROR] Error %s", err)
@@ -52,7 +48,9 @@ func Parse(feedUrl string, connection *sql.DB) ([]db.News, error) {
 				log.Printf("[ERROR] Error %s", err)
 				continue
 			}
-			description, err := url.QueryUnescape(regExp.ReplaceAllString(item.Description, "\n"))
+			re := regexp.MustCompile("[\\n\\t\\s]{2,}")
+			desc := re.ReplaceAllString(item.Description, "\n")
+			description, err := url.QueryUnescape(desc)
 			if err != nil {
 				log.Printf("[ERROR] Error %s", err)
 				continue
@@ -67,13 +65,13 @@ func Parse(feedUrl string, connection *sql.DB) ([]db.News, error) {
 				log.Printf("[ERROR] Error %s", err)
 				continue
 			}
-			defer res.Body.Close()
 
 			doc, err := goquery.NewDocumentFromReader(res.Body)
 			if err != nil {
 				log.Printf("[ERROR] Error %s", err)
 				continue
 			}
+			_ = res.Body.Close()
 
 			var n db.News
 			n.DateTime = item.PublishedParsed

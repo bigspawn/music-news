@@ -31,7 +31,6 @@ func Select(db *sql.DB, title string) (*sql.Rows, error) {
 	return db.Query("SELECT * FROM public.news WHERE title LIKE '%' || $1 || '%'", title)
 }
 
-// fixme: переделать на запрос с проверкой все ли успешно
 func Insert(db *sql.DB, n News) error {
 	log.Printf("[DEBUG] insert %v", n)
 	var userid int
