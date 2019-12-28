@@ -1,38 +1,45 @@
-package parser
+package main
 
 import (
-	"database/sql"
-	"github.com/PuerkitoBio/goquery"
-	"github.com/bigspawn/music-news/db"
-	"github.com/mmcdole/gofeed"
 	"log"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/PuerkitoBio/goquery"
+	"github.com/mmcdole/gofeed"
 )
 
-var excludeWords = []string{"Leaked\n"}
-var excludeLastWords = []string{"Download\n", "Downloads\n", "Total length:"}
-var excludeGenders = []string{"pop", "rap", "folk", "synthpop", "r&b", "thrash metal", "J-Core", "R&amp;B"}
+var ExcludeWords = []string{"Leaked\n"}
+var ExcludeLastWords = []string{"Download\n", "Downloads\n", "Total length:"}
+var ExcludeGenders = []string{"pop", "rap", "folk", "synthpop", "r&b", "thrash metal", "J-Core", "R&amp;B"}
 
-func Parse(feedUrl string, connection *sql.DB) ([]db.News, error) {
-	var news []db.News
-	feedParser := gofeed.NewParser()
-	feed, err := feedParser.ParseURL(feedUrl)
-	if err != nil {
-		return news, err
+type SiteParser struct {
+	Exclude struct {
+		Words     []string
+		LastWords []string
+		Genders   []string
 	}
+	FeedParser *gofeed.Parser
+	Store      *NewsStore
+	URL        string
+}
+
+func (p *SiteParser) Parse() ([]News, error) {
+	feed, err := p.FeedParser.ParseURL(p.URL)
+	if err != nil {
+		return nil, err
+	}
+	news := make([]News, 10)
 	for _, item := range feed.Items {
 		if item != nil {
-			row, err := db.Select(connection, item.Title)
+			exist, err := p.Store.Exist(item.Title)
 			if err != nil {
-				log.Printf("[ERROR] Error %v", err)
-				continue
+				return nil, err
 			}
-			if row != nil && row.Next() {
-				log.Printf("[INFO] Skip news [%s], it contains in DB", item.Title)
+			if exist {
 				continue
 			}
 
@@ -73,7 +80,7 @@ func Parse(feedUrl string, connection *sql.DB) ([]db.News, error) {
 			}
 			_ = res.Body.Close()
 
-			var n db.News
+			n := &News{}
 			n.DateTime = item.PublishedParsed
 
 			articleDiv := doc.Find("div.ipsType_normal.ipsType_richText.ipsContained").First()
@@ -95,7 +102,7 @@ func Parse(feedUrl string, connection *sql.DB) ([]db.News, error) {
 				continue
 			}
 
-			err = db.Insert(connection, n)
+			err = p.Store.Insert(n)
 			if err != nil {
 				log.Printf("[ERROR] Error %s", err)
 				continue

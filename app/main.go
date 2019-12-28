@@ -4,15 +4,14 @@ import (
 	"log"
 	"os"
 
-	botWrap "github.com/bigspawn/music-news/bot"
-	"github.com/bigspawn/music-news/db"
-	"github.com/bigspawn/music-news/parser"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/mmcdole/gofeed"
+
 	"github.com/jasonlvhit/gocron"
 	"github.com/jessevdk/go-flags"
+	_ "github.com/lib/pq"
 )
 
-type EnvParams struct {
+type params struct {
 	User     string `long:"user" env:"USER"`
 	Passwd   string `long:"passwd" env:"PASSWD"`
 	ProxyURL string `long:"proxy_url" env:"PROXY_URL"`
@@ -23,48 +22,70 @@ type EnvParams struct {
 }
 
 func main() {
-
-	var params EnvParams
-	p := flags.NewParser(&params, flags.Default)
-	if _, err := p.Parse(); err != nil {
+	params := &params{}
+	p := flags.NewParser(params, flags.Default)
+	_, err := p.Parse()
+	if err != nil {
 		os.Exit(0)
 	}
 
 	log.Printf("[DEBUG] %v", params)
-	var bot *tgbotapi.BotAPI
-	if params.ProxyURL != "" {
-		bot2, err := botWrap.Create(params.User, params.Passwd, params.ProxyURL, params.BotID)
-		if err != nil {
-			log.Fatalf("[ERROR] Error %e", err)
-		}
-		bot = bot2
-	} else {
-		bot2, err := botWrap.CreateWithToken(params.BotID)
-		if err != nil {
-			log.Fatalf("[ERROR] Error %e", err)
-		}
-		bot = bot2
+
+	bot, err := NewBotAPI(params)
+	if err != nil {
+		log.Fatalf("[ERROR] Error %e", err)
 	}
 
-	gocron.Every(10).Minutes().Do(parse, bot, params)
+	store, err := NewNewsStore(params.DbURL)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		_ = store.conn.Close()
+	}()
+
+	parser := &SiteParser{
+		Exclude: struct {
+			Words     []string
+			LastWords []string
+			Genders   []string
+		}{
+			Words:     ExcludeWords,
+			LastWords: ExcludeLastWords,
+			Genders:   ExcludeGenders,
+		},
+		FeedParser: gofeed.NewParser(),
+		Store:      store,
+		URL:        params.FeedURL,
+	}
+
+	bot, err = NewBotAPI(params)
+	if err != nil {
+		log.Fatalf("[ERROR] Error %e", err)
+	}
+
+	gocron.Every(10).Minutes().Do(work, bot, parser)
 	gocron.RunAll()
+
 	_, time := gocron.NextRun()
 	log.Printf("[INFO] Next start [%v]", time)
+
 	<-gocron.Start()
 }
 
-func parse(bot *tgbotapi.BotAPI, params EnvParams) {
-	con := db.Connection(params.DbURL)
-	defer con.Close()
-	news, err := parser.Parse(params.FeedURL, con)
+func work(b *Bot, p *SiteParser) {
+	news, err := p.Parse()
 	if err != nil {
-		log.Printf("[ERROR] Error %v. Waiting for next execution", err)
+		log.Printf("[ERROR] Error %s. Waiting for next execution", err.Error())
 		return
 	}
+
 	for _, n := range news {
-		if wasSend := botWrap.SendImage(params.ChatID, n, bot); wasSend {
-			botWrap.SendNews(params.ChatID, n, bot)
-			log.Printf("[INFO] Item was send [%v]", n.Title)
+		err := b.SendImage(n)
+		if err != nil {
+			continue
 		}
+		_ = b.SendNews(n)
+		log.Printf("[INFO] Item was send [%s]", n.Title)
 	}
 }
