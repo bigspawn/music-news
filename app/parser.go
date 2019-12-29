@@ -32,7 +32,7 @@ func (p *SiteParser) Parse() ([]*News, error) {
 	if err != nil {
 		return nil, err
 	}
-	news := make([]*News, 10)
+	var news []*News
 	for _, item := range feed.Items {
 		if item != nil {
 			exist, err := p.Store.Exist(item.Title)
