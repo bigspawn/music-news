@@ -93,7 +93,7 @@ func (p *SiteParser) Parse() ([]*News, error) {
 			}
 
 			imageLink := document.Find("img.ipsImage").First()
-			if link, exist := imageLink.Attr("src"); exist {
+			if link, exist := imageLink.Attr("src"); exist && link != "" {
 				n.ImageLink = link
 				n.Text = p.normalize(description)
 				n.PageLink = item.Link
