@@ -43,7 +43,7 @@ func NewBotAPI(p *params) (*Bot, error) {
 
 }
 
-func (b *Bot) SendNews(news News) error {
+func (b *Bot) SendNews(news *News) error {
 	log.Printf("[INFO] send news in chat %d, %v", b.ChatId, news)
 
 	msg := tgbotapi.NewMessage(b.ChatId, news.Title+"\n"+news.Text)
@@ -60,7 +60,7 @@ func (b *Bot) SendNews(news News) error {
 	return nil
 }
 
-func (b *Bot) SendImage(n News) error {
+func (b *Bot) SendImage(n *News) error {
 	log.Printf("[INFO] send image in chat %d, %v", b.ChatId, n)
 
 	_, err := b.BotAPI.Send(tgbotapi.NewPhotoShare(b.ChatId, n.ImageLink))

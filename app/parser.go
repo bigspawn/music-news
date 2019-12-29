@@ -27,12 +27,12 @@ type SiteParser struct {
 	URL        string
 }
 
-func (p *SiteParser) Parse() ([]News, error) {
+func (p *SiteParser) Parse() ([]*News, error) {
 	feed, err := p.FeedParser.ParseURL(p.URL)
 	if err != nil {
 		return nil, err
 	}
-	news := make([]News, 10)
+	news := make([]*News, 10)
 	for _, item := range feed.Items {
 		if item != nil {
 			exist, err := p.Store.Exist(item.Title)
@@ -62,7 +62,7 @@ func (p *SiteParser) Parse() ([]News, error) {
 				log.Printf("[ERROR] Error %s", err)
 				continue
 			}
-			if containText(description, excludeGenders) {
+			if containText(description, p.Exclude.Genders) {
 				log.Printf("[DEBUG] Exclude item [%s: %s]", item.Title, item.Link)
 				continue
 			}
@@ -95,7 +95,7 @@ func (p *SiteParser) Parse() ([]News, error) {
 			imageLink := document.Find("img.ipsImage").First()
 			if link, exist := imageLink.Attr("src"); exist {
 				n.ImageLink = link
-				n.Text = normalize(description)
+				n.Text = p.normalize(description)
 				n.PageLink = item.Link
 				n.Title = item.Title
 			} else {
@@ -113,14 +113,14 @@ func (p *SiteParser) Parse() ([]News, error) {
 	return news, nil
 }
 
-func normalize(description string) string {
-	for _, word := range excludeLastWords {
+func (p *SiteParser) normalize(description string) string {
+	for _, word := range p.Exclude.LastWords {
 		index := strings.LastIndex(description, word)
 		if index > 0 {
 			description = description[:index]
 		}
 	}
-	for _, word := range excludeWords {
+	for _, word := range p.Exclude.Words {
 		index := strings.Index(description, word)
 		if index > -1 {
 			description = description[:index] + description[index+utf8.RuneCountInString(word):]
