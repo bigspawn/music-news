@@ -63,8 +63,6 @@ func (b *Bot) SendNews(news *News) error {
 func (b *Bot) SendImage(n *News) error {
 	log.Printf("[INFO] send image in chat %d, %v", b.ChatId, n)
 
-	if n.ImageLink
-
 	photo := tgbotapi.NewPhotoShare(b.ChatId, n.ImageLink)
 	_, err := b.BotAPI.Send(photo)
 	if err != nil {
