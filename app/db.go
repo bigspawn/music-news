@@ -6,7 +6,11 @@ import (
 	"time"
 )
 
-var driver = "postgres"
+var (
+	insertQuery = `INSERT INTO public.news(title, playlist, date_time, imageurl, downloadurl) 
+							   VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	driver = "postgres"
+)
 
 // News is an article structure
 type News struct {
@@ -37,6 +41,9 @@ func (nw *NewsStore) Exist(title string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	defer func() {
+		_ = row.Close()
+	}()
 	if row != nil && row.Next() {
 		return true, nil
 	}
@@ -45,9 +52,8 @@ func (nw *NewsStore) Exist(title string) (bool, error) {
 
 func (nw *NewsStore) Insert(n *News) error {
 	var userid int
-	err := nw.conn.QueryRow(`INSERT INTO public.news(title, playlist, date_time, imageurl, downloadurl) 
-							   VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-		n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0]).Scan(&userid)
+	row := nw.conn.QueryRow(insertQuery, n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0])
+	err := row.Scan(&userid)
 	if err != nil {
 		return err
 	}
