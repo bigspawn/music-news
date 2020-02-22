@@ -3,12 +3,18 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"github.com/mmcdole/gofeed"
 
 	"github.com/jasonlvhit/gocron"
 	"github.com/jessevdk/go-flags"
 	_ "github.com/lib/pq"
+)
+
+const (
+	period         = 30 // minutes
+	timeoutBetween = 10 * time.Second
 )
 
 type params struct {
@@ -64,7 +70,7 @@ func main() {
 		log.Fatalf("[ERROR] Error %e", err)
 	}
 
-	gocron.Every(10).Minutes().Do(work, bot, parser)
+	gocron.Every(period).Minutes().Do(work, bot, parser)
 	gocron.RunAll()
 
 	_, time := gocron.NextRun()
@@ -81,6 +87,8 @@ func work(b *Bot, p *SiteParser) {
 	}
 
 	for _, n := range news {
+		time.Sleep(timeoutBetween)
+
 		err := b.SendImage(n)
 		if err != nil {
 			continue

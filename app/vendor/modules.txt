@@ -2,6 +2,8 @@
 github.com/PuerkitoBio/goquery
 # github.com/andybalholm/cascadia v1.0.0
 github.com/andybalholm/cascadia
+# github.com/davecgh/go-spew v1.1.0
+github.com/davecgh/go-spew/spew
 # github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible
 github.com/go-telegram-bot-api/telegram-bot-api
 # github.com/jasonlvhit/gocron v0.0.0-20190402024347-5bcdd9fcfa9b
@@ -20,29 +22,38 @@ github.com/mmcdole/gofeed/internal/shared
 github.com/mmcdole/gofeed/rss
 # github.com/mmcdole/goxpp v0.0.0-20181012175147-0068e33feabf
 github.com/mmcdole/goxpp
+# github.com/pmezard/go-difflib v1.0.0
+github.com/pmezard/go-difflib/difflib
+# github.com/stretchr/objx v0.1.0
+github.com/stretchr/objx
+# github.com/stretchr/testify v1.3.0
+github.com/stretchr/testify
+github.com/stretchr/testify/assert
+github.com/stretchr/testify/http
+github.com/stretchr/testify/mock
 # github.com/technoweenie/multipartstreamer v1.0.1
 github.com/technoweenie/multipartstreamer
 # golang.org/x/net v0.0.0-20190501004415-9ce7a6920f09
-golang.org/x/net/proxy
-golang.org/x/net/internal/socks
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset
+golang.org/x/net/internal/socks
+golang.org/x/net/proxy
 # golang.org/x/text v0.3.2
-golang.org/x/text/transform
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
-golang.org/x/text/encoding/internal/identifier
 golang.org/x/text/encoding/internal
+golang.org/x/text/encoding/internal/identifier
 golang.org/x/text/encoding/japanese
 golang.org/x/text/encoding/korean
 golang.org/x/text/encoding/simplifiedchinese
 golang.org/x/text/encoding/traditionalchinese
 golang.org/x/text/encoding/unicode
-golang.org/x/text/language
-golang.org/x/text/internal/utf8internal
-golang.org/x/text/runes
 golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
+golang.org/x/text/internal/utf8internal
+golang.org/x/text/language
+golang.org/x/text/runes
+golang.org/x/text/transform

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 	"net/http"
 	"net/url"
@@ -12,9 +13,16 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-var ExcludeWords = []string{"Leaked\n"}
-var ExcludeLastWords = []string{"Download\n", "Downloads\n", "Total length:"}
-var ExcludeGenders = []string{"pop", "rap", "folk", "synthpop", "r&b", "thrash metal", "J-Core", "R&amp;B"}
+var (
+	ExcludeWords     = []string{"Leaked\n"}
+	ExcludeLastWords = []string{"Download\n", "Downloads\n", "Total length:"}
+	ExcludeGenders   = []string{"pop", "rap", "folk", "synthpop", "r&b", "thrash metal", "J-Core", "R&amp;B"}
+
+	imageCssSelectorPath      = "html.wf-roboto-n3-active.wf-roboto-n4-active.wf-roboto-i4-active.wf-roboto-n7-active.wf-roboto-i3-active.wf-roboto-i7-active.wf-active body.ipsApp.ipsApp_front.ipsJS_has.ipsClearfix.ipsApp_noTouch main#ipsLayout_body.ipsLayout_container.v-nav-wrap div#ipsLayout_contentArea div#ipsLayout_contentWrapper div#ipsLayout_mainArea div.cTopic.ipsClear.ipsSpacer_top div.ipsAreaBackground_light form article#elComment_212133.cPost.ipsBox.ipsComment.ipsComment_parent.ipsClearfix.ipsClear.ipsColumns.ipsColumns_noSpacing.ipsColumns_collapsePhone div.ipsColumn.ipsColumn_fluid div#comment-212133_wrap.ipsComment_content.ipsType_medium.ipsFaded_withHover div.cPost_contentWrap.ipsPad div.ipsType_normal.ipsType_richText.ipsContained p a img.ipsImage"
+	imageCssSelectorPathThumb = imageCssSelectorPath + ".ipsImage_thumbnailed"
+	imgSelector               = "img.ipsImage.ipsImage_thumbnailed"
+	imgSelector2              = "img.ipsImage"
+)
 
 type SiteParser struct {
 	Exclude struct {
@@ -92,15 +100,16 @@ func (p *SiteParser) Parse() ([]*News, error) {
 				continue
 			}
 
-			imageLink := document.Find("img.ipsImage").First()
-			if link, exist := imageLink.Attr("src"); exist && link != "" {
-				n.ImageLink = link
-				n.Text = p.normalize(description)
-				n.PageLink = item.Link
-				n.Title = item.Title
-			} else {
+			n.PageLink = item.Link
+			n.Title = item.Title
+
+			n.ImageLink, err = extractImage(document)
+			if err != nil {
+				log.Printf("[ERROR] Can't find image link for %v", n)
 				continue
 			}
+
+			n.Text = p.normalize(description)
 
 			err = p.Store.Insert(n)
 			if err != nil {
@@ -111,6 +120,19 @@ func (p *SiteParser) Parse() ([]*News, error) {
 		}
 	}
 	return news, nil
+}
+
+func extractImage(document *goquery.Document) (string, error) {
+	imageLink := document.
+		Find("img.ipsImage").
+		Not("img[src~='https://kingdom-leaks.com/img/lastfm-logo.png']").
+		First()
+
+	if link, ok := imageLink.Attr("src"); ok && link != "" {
+		return link, nil
+	}
+
+	return "", errors.New("image link not found")
 }
 
 func (p *SiteParser) normalize(description string) string {
