@@ -51,15 +51,6 @@ func main() {
 	}()
 
 	parser := &SiteParser{
-		Exclude: struct {
-			Words     []string
-			LastWords []string
-			Genders   []string
-		}{
-			Words:     ExcludeWords,
-			LastWords: ExcludeLastWords,
-			Genders:   ExcludeGenders,
-		},
 		FeedParser: gofeed.NewParser(),
 		Store:      store,
 		URL:        params.FeedURL,

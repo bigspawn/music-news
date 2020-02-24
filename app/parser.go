@@ -15,7 +15,7 @@ import (
 
 var (
 	ExcludeWords     = []string{"Leaked\n"}
-	ExcludeLastWords = []string{"Download\n", "Downloads\n", "Total length:"}
+	ExcludeLastWords = []string{"Download\n", "Downloads\n", "Total length:", "Download", "Support! Facebook / iTunes"}
 	ExcludeGenders   = []string{"pop", "rap", "folk", "synthpop", "r&b", "thrash metal", "J-Core", "R&amp;B"}
 
 	imageCssSelectorPath      = "html.wf-roboto-n3-active.wf-roboto-n4-active.wf-roboto-i4-active.wf-roboto-n7-active.wf-roboto-i3-active.wf-roboto-i7-active.wf-active body.ipsApp.ipsApp_front.ipsJS_has.ipsClearfix.ipsApp_noTouch main#ipsLayout_body.ipsLayout_container.v-nav-wrap div#ipsLayout_contentArea div#ipsLayout_contentWrapper div#ipsLayout_mainArea div.cTopic.ipsClear.ipsSpacer_top div.ipsAreaBackground_light form article#elComment_212133.cPost.ipsBox.ipsComment.ipsComment_parent.ipsClearfix.ipsClear.ipsColumns.ipsColumns_noSpacing.ipsColumns_collapsePhone div.ipsColumn.ipsColumn_fluid div#comment-212133_wrap.ipsComment_content.ipsType_medium.ipsFaded_withHover div.cPost_contentWrap.ipsPad div.ipsType_normal.ipsType_richText.ipsContained p a img.ipsImage"
@@ -25,11 +25,6 @@ var (
 )
 
 type SiteParser struct {
-	Exclude struct {
-		Words     []string
-		LastWords []string
-		Genders   []string
-	}
 	FeedParser *gofeed.Parser
 	Store      *NewsStore
 	URL        string
@@ -70,7 +65,7 @@ func (p *SiteParser) Parse() ([]*News, error) {
 				log.Printf("[ERROR] Error %s", err)
 				continue
 			}
-			if containText(description, p.Exclude.Genders) {
+			if containText(description, ExcludeGenders) {
 				log.Printf("[DEBUG] Exclude item [%s: %s]", item.Title, item.Link)
 				continue
 			}
@@ -136,18 +131,19 @@ func extractImage(document *goquery.Document) (string, error) {
 }
 
 func (p *SiteParser) normalize(description string) string {
-	for _, word := range p.Exclude.LastWords {
+	for _, word := range ExcludeLastWords {
 		index := strings.LastIndex(description, word)
 		if index > 0 {
 			description = description[:index]
 		}
 	}
-	for _, word := range p.Exclude.Words {
+	for _, word := range ExcludeWords {
 		index := strings.Index(description, word)
 		if index > -1 {
 			description = description[:index] + description[index+utf8.RuneCountInString(word):]
 		}
 	}
+	description = strings.ReplaceAll(description, "&nbsp;", "\n")
 	return description
 }
 
