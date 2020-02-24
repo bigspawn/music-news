@@ -2,9 +2,9 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -60,12 +60,8 @@ func (p *SiteParser) Parse() ([]*News, error) {
 			}
 			re := regexp.MustCompile("[\\n\\t\\s]{2,}")
 			desc := re.ReplaceAllString(item.Description, "\n")
-			description, err := url.QueryUnescape(desc)
-			if err != nil {
-				log.Printf("[ERROR] Error %s", err)
-				continue
-			}
-			if containText(description, ExcludeGenders) {
+
+			if containText(desc, ExcludeGenders) {
 				log.Printf("[DEBUG] Exclude item [%s: %s]", item.Title, item.Link)
 				continue
 			}
@@ -104,7 +100,7 @@ func (p *SiteParser) Parse() ([]*News, error) {
 				continue
 			}
 
-			n.Text = p.normalize(description)
+			n.Text = p.normalize(desc)
 
 			err = p.Store.Insert(n)
 			if err != nil {
@@ -143,8 +139,45 @@ func (p *SiteParser) normalize(description string) string {
 			description = description[:index] + description[index+utf8.RuneCountInString(word):]
 		}
 	}
-	description = strings.ReplaceAll(description, "&nbsp;", "\n")
+	description = split(description)
 	return description
+}
+
+const (
+	genderTxt            = " Genre - "
+	genderNextLineTxt    = "\nGenre - "
+	qualityTxt           = " Quality - "
+	qualityNextLineTxt   = "\nQuality - "
+	trackListTxt         = " Tracklist: "
+	trackListNextLineTxt = "\nTracklist:\n"
+)
+
+func split(desc string) string {
+	max := 100
+	n := 1
+	for {
+		if n == max {
+			break
+		}
+
+		prefix := ""
+		if n < 10 {
+			prefix = "0"
+		}
+
+		oldV := fmt.Sprintf(" %s%d. ", prefix, n)
+		newV := fmt.Sprintf("\n%s%d. ", prefix, n)
+		desc = strings.Replace(desc, oldV, newV, 1)
+
+		n++
+	}
+
+	desc = strings.Replace(desc, genderTxt, genderNextLineTxt, 1)
+	desc = strings.Replace(desc, qualityTxt, qualityNextLineTxt, 1)
+	desc = strings.Replace(desc, trackListTxt, trackListNextLineTxt, 1)
+	desc = strings.ReplaceAll(desc, "&nbsp;", "\n")
+
+	return desc
 }
 
 func containText(text string, words []string) bool {

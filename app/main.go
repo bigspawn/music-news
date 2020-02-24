@@ -64,8 +64,8 @@ func main() {
 	gocron.Every(period).Minutes().Do(work, bot, parser)
 	gocron.RunAll()
 
-	_, time := gocron.NextRun()
-	log.Printf("[INFO] Next start [%v]", time)
+	_, nextTime := gocron.NextRun()
+	log.Printf("[INFO] Next start [%v]", nextTime)
 
 	<-gocron.Start()
 }
