@@ -99,19 +99,19 @@ func Search(query, country, entity string) (*SearchResult, error) {
 	u["term"] = []string{query}
 	u["country"] = []string{country}
 	u["entity"] = []string{entity}
+
 	res, err := http.Get("https://itunes.apple.com/search?" + u.Encode())
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		err := res.Body.Close()
-		if err != nil {
+		if err := res.Body.Close(); err != nil {
 			fmt.Printf("[ERROR] close response body: %v\n", err)
 		}
 	}()
+
 	result := SearchResult{}
-	err = json.NewDecoder(res.Body).Decode(&result)
-	if err != nil {
+	if err = json.NewDecoder(res.Body).Decode(&result); err != nil {
 		return nil, err
 	}
 	return &result, nil

@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	url2 "net/url"
 	"strconv"
@@ -12,8 +11,9 @@ import (
 const (
 	country = "US"
 	entity  = "song,album,podcast"
-	key     = "927232ba-554c-4a99-b4ad-b7d16057102e"
 )
+
+var ErrITunesNotFound = errors.New("no results from itunes")
 
 type Platform string
 
@@ -79,41 +79,31 @@ type Link struct {
 	NativeAppUriDesktop string `json:"nativeAppUriDesktop,omitempty"`
 }
 
-// https://itunes.apple.com/search?term=Bring%20me%20the%20horizon%20-%20Throne%20&country=LV&entity=song,album,podcast&callback=__jp6
-func Get(artist, album string) (*SongLinkResponse, error) {
-	search, err := Search(fmt.Sprintf("%s - %s", artist, album), country, entity)
+func GetByTitle(title, key string) (*SongLinkResponse, error) {
+	search, err := Search(title, country, entity)
 	if err != nil {
 		return nil, err
 	}
-	//b, err := json.Marshal(search)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//fmt.Printf("[INFO] results: %s\n", b)
 
 	if search.ResultCount == 0 {
-		return nil, errors.New("no results from itunes")
+		return nil, ErrITunesNotFound
 	}
 
 	v := url2.Values{}
-	v["platform"] = []string{string(ItunesPlatform)}
-	v["type"] = []string{"album"}
-	v["id"] = []string{strconv.Itoa(search.Results[0].CollectionId)}
-	v["key"] = []string{key}
+	v.Set("platform", string(ItunesPlatform))
+	v.Set("type", "album")
+	v.Set("id", strconv.Itoa(search.Results[0].CollectionId))
+	v.Set("key", key)
 
 	reqUrl := "https://api.song.link/v1-alpha.1/links?" + v.Encode()
-	fmt.Println(reqUrl)
-
 	res, err := http.Get(reqUrl)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		err := res.Body.Close()
-		if err != nil {
-			fmt.Printf("[ERROR] close response body: %v\n", err)
-		}
+		_ = res.Body.Close()
 	}()
+
 	links := &SongLinkResponse{}
 	err = json.NewDecoder(res.Body).Decode(links)
 	if err != nil {

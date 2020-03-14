@@ -1,6 +1,6 @@
 create table news
 (
-    id                     serial not null
+    id                     serial  not null
         constraint news_pkey
             primary key,
     country                varchar(255),
@@ -13,11 +13,14 @@ create table news
     pageurl                varchar(255),
     playlist               text,
     title                  varchar(255),
-    posted                 boolean default true,
+    posted                 boolean NOT NULL default true,
     path_to_file           varchar(255),
-    real_file_download_url varchar(255)
+    real_file_download_url varchar(255),
+    notified               bool    NOT NULL default false
 );
 
 alter table news
-    owner to "postgres";
+    owner to "go-music";
 
+alter table news
+    add column notified bool NOT NULL default false;

@@ -1,12 +1,12 @@
 package main
 
 import (
-	"log"
-	"os"
+	"context"
 	"time"
 
 	"github.com/mmcdole/gofeed"
 
+	"github.com/go-pkgz/lgr"
 	"github.com/jasonlvhit/gocron"
 	"github.com/jessevdk/go-flags"
 	_ "github.com/lib/pq"
@@ -15,76 +15,101 @@ import (
 const (
 	period         = 30 // minutes
 	timeoutBetween = 10 * time.Second
+	notifyPeriod   = 3 // hours
 )
 
-type params struct {
-	User     string `long:"user" env:"USER"`
-	Passwd   string `long:"passwd" env:"PASSWD"`
-	ProxyURL string `long:"proxy_url" env:"PROXY_URL"`
-	BotID    string `long:"bot_id" env:"BOT_ID" required:"true"`
-	ChatID   int64  `long:"chat_id" env:"CHAT_ID" required:"true"`
-	FeedURL  string `long:"feed_url" env:"FEED_URL" required:"true"`
-	DbURL    string `long:"db_url" env:"DB_URL" required:"true"`
+var Lgr = lgr.New(lgr.Msec, lgr.Debug, lgr.CallerFile, lgr.CallerFunc)
+
+type Options struct {
+	User       string `long:"user" env:"USER"`
+	Passwd     string `long:"passwd" env:"PASSWD"`
+	ProxyURL   string `long:"proxy_url" env:"PROXY_URL"`
+	FeedURL    string `short:"f" long:"feed_url" env:"FEED_URL"`
+	Notify     bool   `short:"n" long:"notify" env:"NOTIFY"`
+	BotID      string `short:"b" long:"bot_id" env:"BOT_ID" required:"true"`
+	ChatID     int64  `short:"c" long:"chat_id" env:"CHAT_ID" required:"true"`
+	DbURL      string `short:"d" long:"db_url" env:"DB_URL" required:"true"`
+	SongAPIKey string `long:"song_api_key" env:"SONG_API_KEY"`
 }
 
 func main() {
-	params := &params{}
-	p := flags.NewParser(params, flags.Default)
-	_, err := p.Parse()
-	if err != nil {
-		os.Exit(0)
+	opt := &Options{}
+	p := flags.NewParser(opt, flags.Default)
+	if _, err := p.Parse(); err != nil {
+		Lgr.Logf("[FATAL] parse flags %v", err)
 	}
 
-	log.Printf("[DEBUG] %v", params)
+	Lgr.Logf("[INFO] %v", opt)
 
-	bot, err := NewBotAPI(params)
+	bot, err := NewTelegramBotAPI(opt)
 	if err != nil {
-		log.Fatalf("[ERROR] Error %e", err)
+		Lgr.Logf("[FATAL] init bot %v", err)
 	}
 
-	store, err := NewNewsStore(params.DbURL)
+	store, err := NewNewsStore(opt.DbURL)
 	if err != nil {
-		panic(err)
+		Lgr.Logf("[FATAL] init store %v", err)
 	}
 	defer func() {
 		_ = store.conn.Close()
 	}()
 
+	if opt.Notify {
+		notifierRun(store, bot, opt.SongAPIKey)
+	}
+
+	parserRun(store, bot, opt)
+}
+
+func notifierRun(store *Store, bot *TelegramBot, songAPIKey string) {
+	notifier := NewNotifier(store, bot, songAPIKey)
+
+	gocron.Every(notifyPeriod).Hours().Do(doNotify, notifier)
+	gocron.RunAll()
+
+	_, next := gocron.NextRun()
+	Lgr.Logf("[INFO] Next start %s", next)
+
+	<-gocron.Start()
+}
+
+func parserRun(store *Store, bot *TelegramBot, opt *Options) {
 	parser := &SiteParser{
 		FeedParser: gofeed.NewParser(),
 		Store:      store,
-		URL:        params.FeedURL,
-	}
-
-	bot, err = NewBotAPI(params)
-	if err != nil {
-		log.Fatalf("[ERROR] Error %e", err)
+		URL:        opt.FeedURL,
 	}
 
 	gocron.Every(period).Minutes().Do(work, bot, parser)
 	gocron.RunAll()
 
-	_, nextTime := gocron.NextRun()
-	log.Printf("[INFO] Next start [%v]", nextTime)
+	_, next := gocron.NextRun()
+	Lgr.Logf("[INFO] Next start %s", next)
 
 	<-gocron.Start()
 }
 
-func work(b *Bot, p *SiteParser) {
-	news, err := p.Parse()
+func work(b *TelegramBot, p *SiteParser) {
+	items, err := p.Parse()
 	if err != nil {
-		log.Printf("[ERROR] Error %s. Waiting for next execution", err.Error())
+		Lgr.Logf("[ERROR] Error %s. Waiting for next execution", err.Error())
 		return
 	}
 
-	for _, n := range news {
+	for _, item := range items {
 		time.Sleep(timeoutBetween)
-
-		err := b.SendImage(n)
-		if err != nil {
+		if err := b.SendImage(item); err != nil {
 			continue
 		}
-		_ = b.SendNews(n)
-		log.Printf("[INFO] Item was send [%s]", n.Title)
+		_ = b.SendNews(item)
+		Lgr.Logf("[INFO] Item was send [%s]", item.Title)
+	}
+}
+
+func doNotify(n *Notifier) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if err := n.Notify(ctx); err != nil {
+		Lgr.Logf("[ERROR] notifier %v", err)
 	}
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"log"
 	"net"
 	"net/http"
 
@@ -10,12 +9,12 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-type Bot struct {
+type TelegramBot struct {
 	BotAPI *tgbotapi.BotAPI
 	ChatId int64
 }
 
-func NewBotAPI(p *params) (*Bot, error) {
+func NewTelegramBotAPI(p *Options) (*TelegramBot, error) {
 	var err error
 	var bot *tgbotapi.BotAPI
 	if p.ProxyURL != "" {
@@ -39,33 +38,44 @@ func NewBotAPI(p *params) (*Bot, error) {
 			return nil, err
 		}
 	}
-	return &Bot{BotAPI: bot, ChatId: p.ChatID}, nil
+	return &TelegramBot{BotAPI: bot, ChatId: p.ChatID}, nil
 
 }
 
-func (b *Bot) SendNews(news *News) error {
-	log.Printf("[INFO] send news in chat %d, %v", b.ChatId, news)
+func (b *TelegramBot) SendNews(item *News) error {
+	Lgr.Logf("[INFO] send news %v", item)
 
-	msg := tgbotapi.NewMessage(b.ChatId, news.Title+"\n"+news.Text)
-	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("Site page", news.PageLink),
-			tgbotapi.NewInlineKeyboardButtonURL("Download", news.DownloadLink[0]),
-		))
+	msg := tgbotapi.NewMessage(b.ChatId, item.Title+"\n"+item.Text)
+	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonURL("Site page", item.PageLink),
+		tgbotapi.NewInlineKeyboardButtonURL("Download", item.DownloadLink[0]),
+	))
+	if _, err := b.BotAPI.Send(msg); err != nil {
+		return err
+	}
+	return nil
+}
 
-	_, err := b.BotAPI.Send(msg)
+func (b *TelegramBot) SendImage(n *News) error {
+	Lgr.Logf("[INFO] send image%v", n)
+
+	photo := tgbotapi.NewPhotoShare(b.ChatId, n.ImageLink)
+	_, err := b.BotAPI.Send(photo)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (b *Bot) SendImage(n *News) error {
-	log.Printf("[INFO] send image in chat %d, %v", b.ChatId, n)
+func (b *TelegramBot) SendRelease(item *News, releaseLink string) error {
+	Lgr.Logf("[INFO] send release link %s, %v", releaseLink, item)
 
-	photo := tgbotapi.NewPhotoShare(b.ChatId, n.ImageLink)
-	_, err := b.BotAPI.Send(photo)
-	if err != nil {
+	if err := b.SendImage(item); err != nil {
+		return err
+	}
+
+	msg := tgbotapi.NewMessage(b.ChatId, item.Title+"\n"+item.Text+"\nRelease album link: "+releaseLink)
+	if _, err := b.BotAPI.Send(msg); err != nil {
 		return err
 	}
 	return nil

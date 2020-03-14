@@ -26,7 +26,7 @@ var (
 
 type SiteParser struct {
 	FeedParser *gofeed.Parser
-	Store      *NewsStore
+	Store      *Store
 	URL        string
 }
 

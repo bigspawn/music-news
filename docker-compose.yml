@@ -19,7 +19,7 @@ services:
       BOT_ID:
       CHAT_ID:
       DB_URL:
-      FEED_URL: https://kingdom-leaks.com/index.php?/rss/1-new-downloads-only-feed.xml
+      FEED_URL: https://kingdom-leaks.com/index.php?/rss/3-the-kingdom-leaks-everything-feed.xml
 
   postgres-db:
     image: postgres:alpine
