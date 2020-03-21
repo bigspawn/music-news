@@ -6,6 +6,7 @@ import (
 	"net/http"
 	url2 "net/url"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -13,7 +14,11 @@ const (
 	entity  = "song,album,podcast"
 )
 
-var ErrITunesNotFound = errors.New("no results from itunes")
+var (
+	ErriTunesNotFound    = errors.New("no results from itunes")
+	ErriSongLinkNotFound = errors.New("no results from song links")
+	ErrWrongTitle        = errors.New("wrong title")
+)
 
 type Platform string
 
@@ -86,13 +91,35 @@ func GetByTitle(title, key string) (*SongLinkResponse, error) {
 	}
 
 	if search.ResultCount == 0 {
-		return nil, ErrITunesNotFound
+		return nil, ErriTunesNotFound
+	}
+
+	splits := strings.Split(strings.ToLower(title), " - ")
+	if len(splits) != 2 {
+		return nil, ErrWrongTitle
+	}
+	artist := splits[0]
+	album := splits[1]
+
+	var result SearchMap
+	var isSearchResultsContainNeedsResult bool
+	for _, result = range search.Results {
+		if result.WrapperType == "collection" &&
+			strings.Contains(strings.ToLower(result.ArtistName), artist) &&
+			strings.Contains(strings.ToLower(result.CollectionName), album) {
+			isSearchResultsContainNeedsResult = true
+			break
+		}
+	}
+
+	if !isSearchResultsContainNeedsResult {
+		return nil, ErriTunesNotFound
 	}
 
 	v := url2.Values{}
 	v.Set("platform", string(ItunesPlatform))
 	v.Set("type", "album")
-	v.Set("id", strconv.Itoa(search.Results[0].CollectionId))
+	v.Set("id", strconv.Itoa(result.CollectionId))
 	v.Set("key", key)
 
 	reqUrl := "https://api.song.link/v1-alpha.1/links?" + v.Encode()
@@ -104,9 +131,12 @@ func GetByTitle(title, key string) (*SongLinkResponse, error) {
 		_ = res.Body.Close()
 	}()
 
+	if res.StatusCode != 200 {
+		return nil, ErriSongLinkNotFound
+	}
+
 	links := &SongLinkResponse{}
-	err = json.NewDecoder(res.Body).Decode(links)
-	if err != nil {
+	if err = json.NewDecoder(res.Body).Decode(links); err != nil {
 		return nil, err
 	}
 	return links, nil

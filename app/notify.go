@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/bigspawn/music-news/app/api"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -26,13 +27,15 @@ func (n *Notifier) Notify(ctx context.Context) error {
 	}
 
 	for _, item := range items {
-		title := yearRegexp.ReplaceAllString(item.Title, "")
+		title := strings.TrimSpace(yearRegexp.ReplaceAllString(item.Title, ""))
 		Lgr.Logf("[INFO] album title = %s", title)
 
 		resp, err := api.GetByTitle(title, n.key)
 		if err != nil {
-			if err == api.ErrITunesNotFound {
-				Lgr.Logf("[WARN] itunes not found: %s", title)
+			if err == api.ErriTunesNotFound ||
+				err == api.ErriSongLinkNotFound ||
+				err == api.ErrWrongTitle {
+				Lgr.Logf("[WARN] %s: %s", err.Error(), title)
 				continue
 			}
 			return err
