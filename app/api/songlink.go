@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	url2 "net/url"
+	"net/url"
 	"strconv"
 	"strings"
 )
@@ -116,7 +116,7 @@ func GetByTitle(title, key string) (*SongLinkResponse, error) {
 		return nil, ErriTunesNotFound
 	}
 
-	v := url2.Values{}
+	v := url.Values{}
 	v.Set("platform", string(ItunesPlatform))
 	v.Set("type", "album")
 	v.Set("id", strconv.Itoa(result.CollectionId))
