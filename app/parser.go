@@ -122,6 +122,12 @@ func extractImage(document *goquery.Document) (string, error) {
 	if link, ok := imageLink.Attr("src"); ok && link != "" {
 		return link, nil
 	}
+	if link, ok := imageLink.Attr("data-imageproxy-source"); ok && link != "" {
+		return link, nil
+	}
+	if link, ok := imageLink.Attr("data-src"); ok && link != "" {
+		return link, nil
+	}
 
 	return "", errors.New("image link not found")
 }
