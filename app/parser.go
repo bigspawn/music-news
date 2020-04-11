@@ -115,7 +115,8 @@ func (p *SiteParser) Parse() ([]*News, error) {
 
 func extractImage(document *goquery.Document) (string, error) {
 	imageLink := document.
-		Find("img.ipsImage").
+		//Find("img.ipsImage").
+		Find("img[class~=ipsImage]").
 		Not("img[src~='https://kingdom-leaks.com/img/lastfm-logo.png']").
 		First()
 

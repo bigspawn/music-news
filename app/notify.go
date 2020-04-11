@@ -32,20 +32,17 @@ func (n *Notifier) Notify(ctx context.Context) error {
 
 		resp, err := api.GetByTitle(title, n.key)
 		if err != nil {
-			if err == api.ErriTunesNotFound ||
-				err == api.ErriSongLinkNotFound ||
-				err == api.ErrWrongTitle {
-				Lgr.Logf("[WARN] %s: %s", err.Error(), title)
-				continue
-			}
-			return err
+			Lgr.Logf("[ERROR] getting info %s: %s", err.Error(), title)
+			continue
 		}
 		Lgr.Logf("[INFO] album links %v", resp)
 		if err := n.bot.SendRelease(item, resp.PageUrl); err != nil {
-			return err
+			Lgr.Logf("[ERROR] sending %s: %s", err.Error(), title)
+			continue
 		}
 		if err := n.store.UpdateNotifyFlag(ctx, item); err != nil {
-			return err
+			Lgr.Logf("[ERROR] update flag %s: %s", err.Error(), title)
+			continue
 		}
 
 		time.Sleep(time.Second)
