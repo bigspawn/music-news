@@ -121,6 +121,7 @@ func GetByTitle(title, key string) (*SongLinkResponse, error) {
 	v.Set("type", "album")
 	v.Set("id", strconv.Itoa(result.CollectionId))
 	v.Set("key", key)
+	v.Set("userCountry", "US")
 
 	reqUrl := "https://api.song.link/v1-alpha.1/links?" + v.Encode()
 	res, err := http.Get(reqUrl)
@@ -135,9 +136,12 @@ func GetByTitle(title, key string) (*SongLinkResponse, error) {
 		return nil, ErriSongLinkNotFound
 	}
 
-	links := &SongLinkResponse{}
-	if err = json.NewDecoder(res.Body).Decode(links); err != nil {
+	response := &SongLinkResponse{}
+	if err = json.NewDecoder(res.Body).Decode(response); err != nil {
 		return nil, err
 	}
-	return links, nil
+	if response.PageUrl == "" {
+		return nil, errors.New("songs link is empty")
+	}
+	return response, nil
 }
