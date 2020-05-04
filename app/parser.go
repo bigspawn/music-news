@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -48,16 +49,41 @@ func (p *SiteParser) Parse() ([]*News, error) {
 
 			log.Printf("[INFO] Parse news [%s: %s]", item.Title, item.Link)
 
-			response, err := http.Get(item.Link)
+			u, err := url.Parse(item.Link)
+			if err != nil {
+				return nil, err
+			}
+
+			q, err := url.ParseQuery(u.RawQuery)
+			if err != nil {
+				return nil, err
+			}
+			var topic string
+			for k, _ := range q {
+				if strings.Contains(k, "/forums/topic/") {
+					topic = k
+				}
+			}
+			if topic == "" {
+				continue
+			}
+			u.RawQuery = topic
+			item.Link = u.String()
+
+			log.Printf("[INFO] Parse news [%s: %s]", item.Title, item.Link)
+
+			resp, err := http.Get(item.Link)
 			if err != nil {
 				log.Printf("[ERROR] Error %s", err)
 				continue
 			}
-			document, err := goquery.NewDocumentFromReader(response.Body)
+			doc, err := goquery.NewDocumentFromReader(resp.Body)
 			if err != nil {
 				log.Printf("[ERROR] Error %s", err)
 				continue
 			}
+			_ = resp.Body.Close()
+
 			re := regexp.MustCompile("[\\n\\t\\s]{2,}")
 			desc := re.ReplaceAllString(item.Description, "\n")
 
@@ -65,19 +91,6 @@ func (p *SiteParser) Parse() ([]*News, error) {
 				log.Printf("[DEBUG] Exclude item [%s: %s]", item.Title, item.Link)
 				continue
 			}
-
-			res, err := http.Get(item.Link)
-			if err != nil {
-				log.Printf("[ERROR] Error %s", err)
-				continue
-			}
-
-			doc, err := goquery.NewDocumentFromReader(res.Body)
-			if err != nil {
-				log.Printf("[ERROR] Error %s", err)
-				continue
-			}
-			_ = res.Body.Close()
 
 			n := &News{}
 			n.DateTime = item.PublishedParsed
@@ -94,7 +107,7 @@ func (p *SiteParser) Parse() ([]*News, error) {
 			n.PageLink = item.Link
 			n.Title = item.Title
 
-			n.ImageLink, err = extractImage(document)
+			n.ImageLink, err = extractImage(doc)
 			if err != nil {
 				log.Printf("[ERROR] Can't find image link for %v", n)
 				continue
@@ -115,7 +128,7 @@ func (p *SiteParser) Parse() ([]*News, error) {
 
 func extractImage(document *goquery.Document) (string, error) {
 	imageLink := document.
-		//Find("img.ipsImage").
+		Find("div[data-role=commentContent]").
 		Find("img[class~=ipsImage]").
 		Not("img[src~='https://kingdom-leaks.com/img/lastfm-logo.png']").
 		First()
