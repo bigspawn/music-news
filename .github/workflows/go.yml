@@ -27,7 +27,7 @@ jobs:
     - name: Build
       run: |
         cd app
-        go build -v -race.
+        go build -v -race .
 
     - name: Test
       run: |
