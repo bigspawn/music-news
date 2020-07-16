@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
-	"github.com/bigspawn/music-news/app/api"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/bigspawn/music-news/app/api"
 )
 
 var yearRegexp = regexp.MustCompile(`\(\d+\)`)

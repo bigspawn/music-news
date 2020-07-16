@@ -12,6 +12,8 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mmcdole/gofeed"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
@@ -23,6 +25,13 @@ var (
 	imageCssSelectorPathThumb = imageCssSelectorPath + ".ipsImage_thumbnailed"
 	imgSelector               = "img.ipsImage.ipsImage_thumbnailed"
 	imgSelector2              = "img.ipsImage"
+)
+
+var (
+	newsParsed = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "parsed_news_total",
+		Help: "The total number of parsed news",
+	})
 )
 
 type SiteParser struct {
@@ -39,6 +48,8 @@ func (p *SiteParser) Parse() ([]*News, error) {
 	var news []*News
 	for _, item := range feed.Items {
 		if item != nil {
+			newsParsed.Inc()
+
 			exist, err := p.Store.Exist(item.Title)
 			if err != nil {
 				return nil, err

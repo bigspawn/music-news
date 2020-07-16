@@ -6,7 +6,20 @@ import (
 	"net/http"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"golang.org/x/net/proxy"
+)
+
+var (
+	newsNotified = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "notified_news_total",
+		Help: "The total number of notified news",
+	})
+	newsSended = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "sended_news_total",
+		Help: "The total number of sended news",
+	})
 )
 
 type TelegramBot struct {
@@ -53,6 +66,9 @@ func (b *TelegramBot) SendNews(item *News) error {
 	if _, err := b.BotAPI.Send(msg); err != nil {
 		return err
 	}
+
+	newsSended.Inc()
+
 	return nil
 }
 
@@ -78,5 +94,8 @@ func (b *TelegramBot) SendRelease(item *News, releaseLink string) error {
 	if _, err := b.BotAPI.Send(msg); err != nil {
 		return err
 	}
+
+	newsNotified.Inc()
+
 	return nil
 }
