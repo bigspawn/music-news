@@ -68,8 +68,7 @@ func (s *Store) Exist(title string) (bool, error) {
 func (s *Store) Insert(n *News) error {
 	var userID int
 	row := s.conn.QueryRow(insertQuery, n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0], n.PageLink)
-	err := row.Scan(&userID)
-	if err != nil {
+	if err := row.Scan(&userID); err != nil {
 		return err
 	}
 	log.Printf("[DEBUG] insert %v", n)
@@ -77,33 +76,34 @@ func (s *Store) Insert(n *News) error {
 }
 
 func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]*News, error) {
-	forNotify := make([]*News, 0)
-
 	rows, err := s.conn.QueryContext(ctx, selectNotified)
 	if err != nil {
 		return nil, err
 	}
 
+	var (
+		ID           = new(int)
+		Title        = new(string)
+		Text         = new(string)
+		ImageLink    = new(string)
+		DownloadLink = new(string)
+		DateTime     = new(time.Time)
+		forNotify    = make([]*News, 0)
+	)
+
 	for rows.Next() {
-		var (
-			ID           = new(int)
-			Title        = new(string)
-			Text         = new(string)
-			ImageLink    = new(string)
-			DownloadLink = new(string)
-			DateTime     = new(time.Time)
-		)
 		if err := rows.Scan(ID, Title, Text, ImageLink, DateTime, DownloadLink); err != nil {
 			return nil, err
 		}
-		forNotify = append(forNotify, &News{
+		n := &News{
 			ID:           *ID,
 			Title:        *Title,
 			Text:         *Text,
 			ImageLink:    *ImageLink,
 			DownloadLink: strings.Split(*DownloadLink, ","),
 			DateTime:     DateTime,
-		})
+		}
+		forNotify = append(forNotify, n)
 	}
 	return forNotify, nil
 }
