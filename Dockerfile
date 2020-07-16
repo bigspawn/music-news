@@ -6,7 +6,7 @@ WORKDIR /build/app
 
 ENV GOFLAGS="-mod=vendor"
 
-RUN go test -v -race ./app
+RUN go test -v -race .
 
 RUN go build -o music-news .
 
