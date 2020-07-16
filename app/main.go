@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"time"
-
-	"github.com/mmcdole/gofeed"
 
 	"github.com/go-pkgz/lgr"
 	"github.com/jasonlvhit/gocron"
 	"github.com/jessevdk/go-flags"
 	_ "github.com/lib/pq"
+	"github.com/mmcdole/gofeed"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const (
@@ -53,6 +54,8 @@ func main() {
 	defer func() {
 		_ = store.conn.Close()
 	}()
+
+	metrics()
 
 	if opt.Notify {
 		notifierRun(store, bot, opt.SongAPIKey)
@@ -112,4 +115,9 @@ func doNotify(n *Notifier) {
 	if err := n.Notify(ctx); err != nil {
 		Lgr.Logf("[ERROR] notifier %v", err)
 	}
+}
+
+func metrics() {
+	http.Handle("/metrics", promhttp.Handler())
+	http.ListenAndServe(":9091", nil)
 }
