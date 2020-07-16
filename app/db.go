@@ -11,8 +11,8 @@ import (
 
 const (
 	driver      = "postgres"
-	insertQuery = `		INSERT INTO public.news(title, playlist, date_time, imageurl, downloadurl) 
-						VALUES ($1, $2, $3, $4, $5) RETURNING id`
+	insertQuery = `		INSERT INTO public.news(title, playlist, date_time, imageurl, downloadurl, pageurl) 
+						VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
 
 	selectNotified = `	SELECT id, title, playlist, imageurl, date_time, downloadurl
 						FROM public.news
@@ -66,9 +66,9 @@ func (s *Store) Exist(title string) (bool, error) {
 }
 
 func (s *Store) Insert(n *News) error {
-	var userid int
-	row := s.conn.QueryRow(insertQuery, n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0])
-	err := row.Scan(&userid)
+	var userID int
+	row := s.conn.QueryRow(insertQuery, n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0], n.PageLink)
+	err := row.Scan(&userID)
 	if err != nil {
 		return err
 	}
