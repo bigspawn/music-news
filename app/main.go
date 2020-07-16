@@ -55,7 +55,7 @@ func main() {
 		_ = store.conn.Close()
 	}()
 
-	metrics()
+	go metrics()
 
 	if opt.Notify {
 		notifierRun(store, bot, opt.SongAPIKey)
