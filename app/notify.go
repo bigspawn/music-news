@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"regexp"
 	"strings"
 	"time"
@@ -15,10 +17,12 @@ type Notifier struct {
 	store *Store
 	bot   *TelegramBot
 	key   string
+	gauge prometheus.Gauge
 }
 
 func NewNotifier(s *Store, bot *TelegramBot, songAPIKey string) *Notifier {
-	return &Notifier{store: s, bot: bot, key: songAPIKey}
+	gauge := promauto.NewGauge(prometheus.GaugeOpts{Name: "notified_news_gauge"})
+	return &Notifier{store: s, bot: bot, key: songAPIKey, gauge: gauge}
 }
 
 func (n *Notifier) Notify(ctx context.Context) error {
@@ -27,6 +31,7 @@ func (n *Notifier) Notify(ctx context.Context) error {
 		return err
 	}
 
+	count := 0
 	for _, item := range items {
 		title := strings.TrimSpace(yearRegexp.ReplaceAllString(item.Title, ""))
 		Lgr.Logf("[INFO] album title = %s", title)
@@ -48,5 +53,7 @@ func (n *Notifier) Notify(ctx context.Context) error {
 
 		time.Sleep(time.Second)
 	}
+	n.gauge.Set(float64(count))
+
 	return nil
 }

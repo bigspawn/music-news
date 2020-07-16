@@ -77,11 +77,7 @@ func notifierRun(store *Store, bot *TelegramBot, songAPIKey string) {
 }
 
 func parserRun(store *Store, bot *TelegramBot, opt *Options) {
-	parser := &SiteParser{
-		FeedParser: gofeed.NewParser(),
-		Store:      store,
-		URL:        opt.FeedURL,
-	}
+	parser := NewParser(gofeed.NewParser(), store, opt.FeedURL)
 
 	gocron.Every(period).Minutes().Do(work, bot, parser)
 	gocron.RunAll()
@@ -99,6 +95,7 @@ func work(b *TelegramBot, p *SiteParser) {
 		return
 	}
 
+	count := 0
 	for _, item := range items {
 		time.Sleep(timeoutBetween)
 		if err := b.SendImage(item); err != nil {
@@ -106,7 +103,9 @@ func work(b *TelegramBot, p *SiteParser) {
 		}
 		_ = b.SendNews(item)
 		Lgr.Logf("[INFO] Item was send [%s]", item.Title)
+		count++
 	}
+	p.Gauge.Set(float64(count))
 }
 
 func doNotify(n *Notifier) {

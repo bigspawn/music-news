@@ -38,6 +38,17 @@ type SiteParser struct {
 	FeedParser *gofeed.Parser
 	Store      *Store
 	URL        string
+	Gauge      prometheus.Gauge
+}
+
+func NewParser(FeedParser *gofeed.Parser, Store *Store, URL string) *SiteParser {
+	gauge := promauto.NewGauge(prometheus.GaugeOpts{Name: "sent_news_gauge"})
+	return &SiteParser{
+		FeedParser: FeedParser,
+		Store:      Store,
+		URL:        URL,
+		Gauge:      gauge,
+	}
 }
 
 func (p *SiteParser) Parse() ([]*News, error) {
