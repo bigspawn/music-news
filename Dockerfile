@@ -1,6 +1,7 @@
 FROM golang:1.14 as build
 
 ENV GOFLAGS="-mod=vendor"
+ENV CGO_ENABLED=0
 
 ADD . /build
 
