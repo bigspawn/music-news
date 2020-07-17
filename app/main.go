@@ -133,10 +133,7 @@ func work(b *TelegramBot, p *SiteParser) {
 }
 
 func doNotify(n *Notifier) {
-	ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
-	defer cancel()
-
-	if err := n.Notify(ctx); err != nil {
+	if err := n.Notify(); err != nil {
 		Lgr.Logf("[ERROR] notifier %v", err)
 	}
 }

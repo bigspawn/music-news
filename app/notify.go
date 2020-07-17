@@ -23,7 +23,10 @@ func NewNotifier(s *Store, bot *TelegramBot, links *LinksApi) *Notifier {
 	}
 }
 
-func (n *Notifier) Notify(ctx context.Context) error {
+func (n *Notifier) Notify() error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	items, err := n.store.GetWithNotifyFlag(ctx)
 	if err != nil {
 		return err
