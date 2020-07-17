@@ -1,4 +1,4 @@
-FROM golang:1.14
+FROM golang:1.14 as build
 
 ADD . /build
 
@@ -11,10 +11,10 @@ RUN go test -v -race .
 RUN go build -o music-news .
 
 # Build container
-FROM golang:alpine
+FROM golang:1.14-alpine
 
-WORKDIR /app
+WORKDIR /srv
 
-COPY --from=0 /build/app/music-news .
+COPY --from=build /build/app/music-news /srv/music-news
 
-CMD ["./music-news"]
+CMD ["/srv/music-news"]
