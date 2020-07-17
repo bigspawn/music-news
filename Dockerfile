@@ -1,10 +1,10 @@
 FROM golang:1.14 as build
 
+ENV GOFLAGS="-mod=vendor"
+
 ADD . /build
 
 WORKDIR /build/app
-
-ENV GOFLAGS="-mod=vendor"
 
 RUN go test -v -race .
 
