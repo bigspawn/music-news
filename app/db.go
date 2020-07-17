@@ -10,30 +10,35 @@ import (
 
 const (
 	driver      = "postgres"
-	insertQuery = `			INSERT INTO public.news(title, playlist, date_time, imageurl, downloadurl, pageurl, posted) 
-							VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
+	insertQuery = `			INSERT INTO public.news(title, playlist, date_time, imageurl, downloadurl, pageurl, posted, created_at) 
+							VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
 
 	selectNotified = `		SELECT id, title, playlist, imageurl, date_time, downloadurl
 							FROM public.news
 							WHERE notified = false
 							  AND title NOT LIKE '%Single%'
 							  AND title NOT LIKE '%single%'
-							  AND date_time > now() - interval '1 week'
+							  AND created_at > now() - interval '1 week'
 							ORDER BY date_time`
 
 	updateNotified = `		UPDATE news 
 							SET notified = true 
 							WHERE id = $1`
 
-	selectUnpublished = `	SELECT id, title, playlist, imageurl, date_time, downloadurl
+	selectUnpublished = `	SELECT id, title, playlist, imageurl, date_time, downloadurl, pageurl
 							FROM public.news
 							WHERE posted = false
-							  AND date_time > now() - interval '1 week'
+							  AND created_at > now() - interval '1 week'
+							  AND created_at < now() - interval '1 minute'
 							ORDER BY date_time`
 
 	updatePosted = `		UPDATE news 
 							SET posted = true 
 							WHERE title = $1`
+
+	selectExists = `		SELECT * 
+							FROM public.news 
+							WHERE title LIKE '%' || $1 || '%'`
 )
 
 // News is an article structure
@@ -60,7 +65,7 @@ func NewNewsStore(conn string) (*Store, error) {
 }
 
 func (s *Store) Exist(ctx context.Context, title string) (bool, error) {
-	row, err := s.conn.QueryContext(ctx, "SELECT * FROM public.news WHERE title LIKE '%' || $1 || '%'", title)
+	row, err := s.conn.QueryContext(ctx, selectExists, title)
 	if err != nil {
 		return false, err
 	}
@@ -73,11 +78,16 @@ func (s *Store) Exist(ctx context.Context, title string) (bool, error) {
 
 func (s *Store) Insert(ctx context.Context, n *News) error {
 	var userID int
-	row := s.conn.QueryRowContext(ctx, insertQuery, n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0], n.PageLink, false)
+
+	row := s.conn.QueryRowContext(ctx, insertQuery,
+		n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0], n.PageLink, false, time.Now())
+
 	if err := row.Scan(&userID); err != nil {
 		return err
 	}
+
 	Lgr.Logf("[DEBUG] insert %v", n)
+
 	return nil
 }
 
@@ -89,22 +99,24 @@ func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]*News, error) {
 	defer rows.Close()
 
 	var (
-		ID                                   int
-		Title, Text, ImageLink, DownloadLink string
-		DateTime                             *time.Time
+		ID           = new(int)
+		Title        = new(string)
+		Text         = new(string)
+		ImageLink    = new(string)
+		DownloadLink = new(string)
+		DateTime     = new(time.Time)
+		forNotify    = make([]*News, 0)
 	)
-
-	forNotify := make([]*News, 0)
 	for rows.Next() {
-		if err := rows.Scan(&ID, &Title, &Text, &ImageLink, DateTime, &DownloadLink); err != nil {
+		if err := rows.Scan(ID, Title, Text, ImageLink, DateTime, DownloadLink); err != nil {
 			return nil, err
 		}
 		n := &News{
-			ID:           ID,
-			Title:        Title,
-			Text:         Text,
-			ImageLink:    ImageLink,
-			DownloadLink: strings.Split(DownloadLink, ","),
+			ID:           *ID,
+			Title:        *Title,
+			Text:         *Text,
+			ImageLink:    *ImageLink,
+			DownloadLink: strings.Split(*DownloadLink, ","),
 			DateTime:     DateTime,
 		}
 		forNotify = append(forNotify, n)
@@ -135,23 +147,27 @@ func (s *Store) GetUnpublished(ctx context.Context) (map[string]*News, error) {
 	defer rows.Close()
 
 	var (
-		ID                                   int
-		Title, Text, ImageLink, DownloadLink string
-		DateTime                             *time.Time
+		ID           = new(int)
+		Title        = new(string)
+		Text         = new(string)
+		ImageLink    = new(string)
+		PageLink     = new(string)
+		DownloadLink = new(string)
+		DateTime     = new(time.Time)
+		unpublished  = make(map[string]*News)
 	)
-
-	unpublished := make(map[string]*News)
 	for rows.Next() {
-		if err := rows.Scan(&ID, &Title, &Text, &ImageLink, DateTime, &DownloadLink); err != nil {
+		if err := rows.Scan(ID, Title, Text, ImageLink, DateTime, DownloadLink, PageLink); err != nil {
 			return nil, err
 		}
 		n := &News{
-			ID:           ID,
-			Title:        Title,
-			Text:         Text,
-			ImageLink:    ImageLink,
-			DownloadLink: strings.Split(DownloadLink, ","),
+			ID:           *ID,
+			Title:        *Title,
+			Text:         *Text,
+			ImageLink:    *ImageLink,
+			DownloadLink: strings.Split(*DownloadLink, ","),
 			DateTime:     DateTime,
+			PageLink:     *PageLink,
 		}
 		unpublished[n.Title] = n
 	}

@@ -22,5 +22,12 @@ create table news
 alter table news
     owner to "go-music";
 
+-- alter table news
+--     add column notified bool NOT NULL default false;
+
 alter table news
-    add column notified bool NOT NULL default false;
+    add column created_at timestamp;
+
+update news n
+set created_at = n.date_time
+where n.created_at is null;
