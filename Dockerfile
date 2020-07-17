@@ -1,4 +1,16 @@
-FROM golang:1.14 as build
+FROM golang:1.14 as test
+
+ENV GOFLAGS="-mod=vendor"
+
+ADD . /build
+
+WORKDIR /build/app
+
+RUN go test -v -race .
+
+
+
+FROM golang:1.14-alpine as build
 
 ENV GOFLAGS="-mod=vendor"
 ENV CGO_ENABLED=0
@@ -7,11 +19,10 @@ ADD . /build
 
 WORKDIR /build/app
 
-RUN go test -v -race .
-
 RUN go build -o music-news .
 
-# Build container
+
+
 FROM golang:1.14-alpine
 
 WORKDIR /srv
