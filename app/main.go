@@ -68,7 +68,8 @@ func main() {
 }
 
 func notifierRun(store *Store, bot *TelegramBot, songAPIKey string) {
-	notifier := NewNotifier(store, bot, songAPIKey)
+	links := NewLinkApi(songAPIKey)
+	notifier := NewNotifier(store, bot, links)
 
 	gocron.Every(notifyPeriod).Hours().Do(doNotify, notifier)
 	gocron.RunAll()
@@ -142,5 +143,7 @@ func doNotify(n *Notifier) {
 
 func metrics() {
 	http.Handle("/metrics", promhttp.Handler())
-	http.ListenAndServe(":9091", nil)
+	if err := http.ListenAndServe(":9091", nil); err != nil {
+		Lgr.Logf("[ERROR] metrics handler: err=%w", err)
+	}
 }

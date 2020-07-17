@@ -18,7 +18,7 @@ const (
 							WHERE notified = false
 							  AND title NOT LIKE '%Single%'
 							  AND title NOT LIKE '%single%'
-							  AND created_at > now() - interval '1 week'
+							  AND created_at > now() - interval '4 week'
 							ORDER BY date_time`
 
 	updateNotified = `		UPDATE news 
