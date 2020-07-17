@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -52,7 +53,7 @@ func NewParser(FeedParser *gofeed.Parser, Store *Store, URL string) *SiteParser 
 	}
 }
 
-func (p *SiteParser) Parse() ([]*News, error) {
+func (p *SiteParser) Parse(ctx context.Context) ([]*News, error) {
 	feed, err := p.FeedParser.ParseURL(p.URL)
 	if err != nil {
 		return nil, err
@@ -66,7 +67,7 @@ func (p *SiteParser) Parse() ([]*News, error) {
 
 		newsParsed.Inc()
 
-		exist, err := p.Store.Exist(item.Title)
+		exist, err := p.Store.Exist(ctx, item.Title)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +88,7 @@ func (p *SiteParser) Parse() ([]*News, error) {
 			continue
 		}
 
-		if err = p.Store.Insert(n); err != nil {
+		if err = p.Store.Insert(ctx, n); err != nil {
 			Lgr.Logf("[ERROR] saving: item=%v, err=%v", item, err)
 			continue
 		}
@@ -97,6 +98,29 @@ func (p *SiteParser) Parse() ([]*News, error) {
 	p.ParsedGauge.Set(float64(len(news)))
 
 	return news, nil
+}
+
+func (p *SiteParser) MergeWithUnpublished(ctx context.Context, items []*News) ([]*News, error) {
+	unpublished, err := p.Store.GetUnpublished(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(unpublished) == 0 {
+		return items, nil
+	}
+
+	forPublishing := make([]*News, 0)
+	for _, item := range unpublished {
+		forPublishing = append(forPublishing, item)
+	}
+	for _, item := range items {
+		if _, ok := unpublished[item.Title]; ok {
+			continue
+		}
+		forPublishing = append(forPublishing, item)
+	}
+	return forPublishing, nil
 }
 
 func parseItem(item *gofeed.Item) (*News, error) {

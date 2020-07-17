@@ -24,6 +24,12 @@ const (
 	updateNotified = `	UPDATE news 
 						SET notified = true 
 						WHERE id = $1`
+
+	selectUnpublished = `	SELECT id, title, playlist, imageurl, date_time, downloadurl
+							FROM public.news
+							WHERE posted = false
+							  AND date_time > now() - interval '1 week'
+							ORDER BY date_time`
 )
 
 // News is an article structure
@@ -49,9 +55,8 @@ func NewNewsStore(conn string) (*Store, error) {
 	return &Store{conn: db}, nil
 }
 
-// fixme: change on one operation UPDATE
-func (s *Store) Exist(title string) (bool, error) {
-	row, err := s.conn.Query("SELECT * FROM public.news WHERE title LIKE '%' || $1 || '%'", title)
+func (s *Store) Exist(ctx context.Context, title string) (bool, error) {
+	row, err := s.conn.QueryContext(ctx, "SELECT * FROM public.news WHERE title LIKE '%' || $1 || '%'", title)
 	if err != nil {
 		return false, err
 	}
@@ -62,9 +67,9 @@ func (s *Store) Exist(title string) (bool, error) {
 	return false, nil
 }
 
-func (s *Store) Insert(n *News) error {
+func (s *Store) Insert(ctx context.Context, n *News) error {
 	var userID int
-	row := s.conn.QueryRow(insertQuery, n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0], n.PageLink)
+	row := s.conn.QueryRowContext(ctx, insertQuery, n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0], n.PageLink)
 	if err := row.Scan(&userID); err != nil {
 		return err
 	}
@@ -116,4 +121,35 @@ func (s *Store) UpdateNotifyFlag(ctx context.Context, item *News) error {
 		return fmt.Errorf("expected to affect 1 row, affected %d", rows)
 	}
 	return nil
+}
+
+func (s *Store) GetUnpublished(ctx context.Context) (map[string]*News, error) {
+	rows, err := s.conn.QueryContext(ctx, selectUnpublished)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var (
+		ID                                   int
+		Title, Text, ImageLink, DownloadLink string
+		DateTime                             *time.Time
+	)
+
+	unpublished := make(map[string]*News)
+	for rows.Next() {
+		if err := rows.Scan(&ID, &Title, &Text, &ImageLink, DateTime, &DownloadLink); err != nil {
+			return nil, err
+		}
+		n := &News{
+			ID:           ID,
+			Title:        Title,
+			Text:         Text,
+			ImageLink:    ImageLink,
+			DownloadLink: strings.Split(DownloadLink, ","),
+			DateTime:     DateTime,
+		}
+		unpublished[n.Title] = n
+	}
+	return unpublished, nil
 }

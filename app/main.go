@@ -14,9 +14,12 @@ import (
 )
 
 const (
-	period         = 30 // minutes
+	period       = 30 // minutes
+	notifyPeriod = 3  // hours
+
 	timeoutBetween = 10 * time.Second
-	notifyPeriod   = 3 // hours
+	parsingTimeout = 5 * time.Minute
+	notifyTimeout  = 5 * time.Minute
 )
 
 var Lgr = lgr.New(lgr.Msec, lgr.Debug, lgr.CallerFile, lgr.CallerFunc)
@@ -89,28 +92,46 @@ func parserRun(store *Store, bot *TelegramBot, opt *Options) {
 }
 
 func work(b *TelegramBot, p *SiteParser) {
-	items, err := p.Parse()
+	ctx, cancel := context.WithTimeout(context.Background(), parsingTimeout)
+	defer cancel()
+
+	items, err := p.Parse(ctx)
 	if err != nil {
-		Lgr.Logf("[ERROR] Error %s. Waiting for next execution", err.Error())
+		Lgr.Logf("[ERROR] can't parse: err=%w", err)
+		return
+	}
+
+	items, err = p.MergeWithUnpublished(ctx, items)
+	if err != nil {
+		Lgr.Logf("[ERROR] can't merge with unpublished: err=%w", err)
 		return
 	}
 
 	count := 0
 	for _, item := range items {
 		time.Sleep(timeoutBetween)
-		if err := b.SendImage(item); err != nil {
+
+		if err := b.SendImage(ctx, item); err != nil {
+			Lgr.Logf("[ERROR] send image: %w", err)
 			continue
 		}
-		_ = b.SendNews(item)
+		if err := b.SendNews(ctx, item); err != nil {
+			Lgr.Logf("[ERROR] send news: %w", err)
+			continue
+		}
+
 		Lgr.Logf("[INFO] Item was send [%s]", item.Title)
+
 		count++
 	}
+
 	p.SentGauge.Set(float64(count))
 }
 
 func doNotify(n *Notifier) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), notifyTimeout)
 	defer cancel()
+
 	if err := n.Notify(ctx); err != nil {
 		Lgr.Logf("[ERROR] notifier %v", err)
 	}

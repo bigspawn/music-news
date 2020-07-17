@@ -55,14 +55,16 @@ func NewTelegramBotAPI(p *Options) (*TelegramBot, error) {
 
 }
 
-func (b *TelegramBot) SendNews(item *News) error {
+func (b *TelegramBot) SendNews(_ context.Context, item *News) error {
 	Lgr.Logf("[INFO] send news %v", item)
 
 	msg := tgbotapi.NewMessage(b.ChatId, item.Title+"\n"+item.Text)
-	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
-		tgbotapi.NewInlineKeyboardButtonURL("Site page", item.PageLink),
-		tgbotapi.NewInlineKeyboardButtonURL("Download", item.DownloadLink[0]),
-	))
+	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonURL("Site page", item.PageLink),
+			tgbotapi.NewInlineKeyboardButtonURL("Download", item.DownloadLink[0]),
+		),
+	)
 	if _, err := b.BotAPI.Send(msg); err != nil {
 		return err
 	}
@@ -72,12 +74,12 @@ func (b *TelegramBot) SendNews(item *News) error {
 	return nil
 }
 
-func (b *TelegramBot) SendImage(n *News) error {
-	Lgr.Logf("[INFO] send image%v", n)
+func (b *TelegramBot) SendImage(_ context.Context, n *News) error {
+	Lgr.Logf("[INFO] send image %v", n)
 
 	photo := tgbotapi.NewPhotoShare(b.ChatId, n.ImageLink)
-	_, err := b.BotAPI.Send(photo)
-	if err != nil {
+
+	if _, err := b.BotAPI.Send(photo); err != nil {
 		return err
 	}
 	return nil
@@ -86,7 +88,7 @@ func (b *TelegramBot) SendImage(n *News) error {
 func (b *TelegramBot) SendRelease(item *News, releaseLink string) error {
 	Lgr.Logf("[INFO] send release link %s, %v", releaseLink, item)
 
-	if err := b.SendImage(item); err != nil {
+	if err := b.SendImage(nil, item); err != nil {
 		return err
 	}
 
