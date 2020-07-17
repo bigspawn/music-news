@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 )
@@ -56,9 +55,7 @@ func (s *Store) Exist(title string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer func() {
-		_ = row.Close()
-	}()
+	defer row.Close()
 	if row != nil && row.Next() {
 		return true, nil
 	}
@@ -71,7 +68,7 @@ func (s *Store) Insert(n *News) error {
 	if err := row.Scan(&userID); err != nil {
 		return err
 	}
-	log.Printf("[DEBUG] insert %v", n)
+	Lgr.Logf("[DEBUG] insert %v", n)
 	return nil
 }
 
@@ -80,27 +77,25 @@ func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]*News, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var (
-		ID           = new(int)
-		Title        = new(string)
-		Text         = new(string)
-		ImageLink    = new(string)
-		DownloadLink = new(string)
-		DateTime     = new(time.Time)
-		forNotify    = make([]*News, 0)
+		ID                                   int
+		Title, Text, ImageLink, DownloadLink string
+		DateTime                             *time.Time
 	)
 
+	forNotify := make([]*News, 0)
 	for rows.Next() {
-		if err := rows.Scan(ID, Title, Text, ImageLink, DateTime, DownloadLink); err != nil {
+		if err := rows.Scan(&ID, &Title, &Text, &ImageLink, DateTime, &DownloadLink); err != nil {
 			return nil, err
 		}
 		n := &News{
-			ID:           *ID,
-			Title:        *Title,
-			Text:         *Text,
-			ImageLink:    *ImageLink,
-			DownloadLink: strings.Split(*DownloadLink, ","),
+			ID:           ID,
+			Title:        Title,
+			Text:         Text,
+			ImageLink:    ImageLink,
+			DownloadLink: strings.Split(DownloadLink, ","),
 			DateTime:     DateTime,
 		}
 		forNotify = append(forNotify, n)

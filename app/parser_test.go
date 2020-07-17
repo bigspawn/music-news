@@ -2785,3 +2785,41 @@ func TestParseImage(t *testing.T) {
 		t.Errorf("not equals:\n expected\t= %s\n actual\t\t= %s", expected, image)
 	}
 }
+
+func Test_split(t *testing.T) {
+	tests := []struct {
+		name string
+		desc string
+		want string
+	}{
+		{
+			name: "without prefix",
+			desc: "Leaked Release - July 17, 2020 Genre - Progressive Metalcore, Djent Quality - MP3, 320 kbps CBR / FLAC &nbsp; Tracklist: 1. Shimmer (5:23) 2. The New Perspective (3:23) &nbsp; ",
+			want: `Leaked Release - July 17, 2020
+Genre - Progressive Metalcore, Djent
+Quality - MP3, 320 kbps CBR / FLAC 
+ Tracklist:
+1. Shimmer (5:23)
+2. The New Perspective (3:23) 
+ `,
+		},
+		{
+			name: "with prefix",
+			desc: "Leaked Release - July 17, 2020 Genre - Progressive Metalcore, Djent Quality - MP3, 320 kbps CBR / FLAC &nbsp; Tracklist: 01. Shimmer (5:23) 02. The New Perspective (3:23) &nbsp; ",
+			want: `Leaked Release - July 17, 2020
+Genre - Progressive Metalcore, Djent
+Quality - MP3, 320 kbps CBR / FLAC 
+ Tracklist:
+01. Shimmer (5:23)
+02. The New Perspective (3:23) 
+ `,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := split(tt.desc); got != tt.want {
+				t.Errorf("split() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -105,7 +105,7 @@ func work(b *TelegramBot, p *SiteParser) {
 		Lgr.Logf("[INFO] Item was send [%s]", item.Title)
 		count++
 	}
-	p.Gauge.Set(float64(count))
+	p.SentGauge.Set(float64(count))
 }
 
 func doNotify(n *Notifier) {

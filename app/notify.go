@@ -50,6 +50,7 @@ func (n *Notifier) Notify(ctx context.Context) error {
 			Lgr.Logf("[ERROR] update flag %s: %s", err.Error(), title)
 			continue
 		}
+		count++
 
 		time.Sleep(time.Second)
 	}
