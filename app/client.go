@@ -176,7 +176,7 @@ func (a *LinksApi) getIDiTunes(_ context.Context, title string) (string, error) 
 		}
 	}
 
-	Lgr.Logf("[INFO] iTunes response: %s", result)
+	Lgr.Logf("[INFO] iTunes response: %v", result)
 
 	return "", fmt.Errorf("albums in iTunes not found: title=%s", title)
 }
