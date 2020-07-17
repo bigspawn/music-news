@@ -38,15 +38,15 @@ func (n *Notifier) Notify() error {
 
 		link, err := n.links.GetLink(ctx, item.Title)
 		if err != nil {
-			Lgr.Logf("[ERROR] getting link: title=%s, err=%w", item.Title, err)
+			Lgr.Logf("[ERROR] getting link: title=%s, err=%v", item.Title, err)
 			continue
 		}
 		if err := n.bot.SendRelease(item, link); err != nil {
-			Lgr.Logf("[ERROR] sending: title=%s, err=%w", item.Title, err)
+			Lgr.Logf("[ERROR] sending: title=%s, err=%v", item.Title, err)
 			continue
 		}
 		if err := n.store.UpdateNotifyFlag(ctx, item); err != nil {
-			Lgr.Logf("[ERROR] update notify flag: title=%s, err=%w", item.Title, err)
+			Lgr.Logf("[ERROR] update notify flag: title=%s, err=%v", item.Title, err)
 			continue
 		}
 		count++

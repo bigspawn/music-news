@@ -98,13 +98,13 @@ func work(b *TelegramBot, p *SiteParser) {
 
 	items, err := p.Parse(ctx)
 	if err != nil {
-		Lgr.Logf("[ERROR] can't parse: err=%w", err)
+		Lgr.Logf("[ERROR] can't parse: err=%v", err)
 		return
 	}
 
 	items, err = p.MergeWithUnpublished(ctx, items)
 	if err != nil {
-		Lgr.Logf("[ERROR] can't merge with unpublished: err=%w", err)
+		Lgr.Logf("[ERROR] can't merge with unpublished: err=%v", err)
 		return
 	}
 
@@ -113,15 +113,15 @@ func work(b *TelegramBot, p *SiteParser) {
 		time.Sleep(timeoutBetween)
 
 		if err := b.SendImage(ctx, item); err != nil {
-			Lgr.Logf("[ERROR] send image: %w", err)
+			Lgr.Logf("[ERROR] send image: %v", err)
 			continue
 		}
 		if err := b.SendNews(ctx, item); err != nil {
-			Lgr.Logf("[ERROR] send news: %w", err)
+			Lgr.Logf("[ERROR] send news: %v", err)
 			continue
 		}
 		if err := p.SetPosted(ctx, item); err != nil {
-			Lgr.Logf("[ERROR] can't set posted: item=%v, err=%w", item, err)
+			Lgr.Logf("[ERROR] can't set posted: item=%v, err=%v", item, err)
 		}
 
 		Lgr.Logf("[INFO] Item was send [%s]", item.Title)
@@ -141,6 +141,6 @@ func doNotify(n *Notifier) {
 func metrics() {
 	http.Handle("/metrics", promhttp.Handler())
 	if err := http.ListenAndServe(":9091", nil); err != nil {
-		Lgr.Logf("[ERROR] metrics handler: err=%w", err)
+		Lgr.Logf("[ERROR] metrics handler: err=%v", err)
 	}
 }
