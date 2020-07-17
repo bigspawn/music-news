@@ -1,10 +1,12 @@
-FROM golang:1.14-alpine
+FROM golang:1.14
 
 ADD . /build
 
 WORKDIR /build/app
 
 ENV GOFLAGS="-mod=vendor"
+
+RUN go test -v -race .
 
 RUN go build -o music-news .
 
