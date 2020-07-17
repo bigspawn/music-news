@@ -38,15 +38,16 @@ var (
 
 type SiteParser struct {
 	FeedParser             *gofeed.Parser
-	Store                  *Store
 	URL                    string
 	SentGauge, ParsedGauge prometheus.Gauge
+
+	store *Store
 }
 
 func NewParser(FeedParser *gofeed.Parser, Store *Store, URL string) *SiteParser {
 	return &SiteParser{
 		FeedParser:  FeedParser,
-		Store:       Store,
+		store:       Store,
 		URL:         URL,
 		SentGauge:   promauto.NewGauge(prometheus.GaugeOpts{Name: "sent_news_gauge"}),
 		ParsedGauge: promauto.NewGauge(prometheus.GaugeOpts{Name: "parsed_news_gauge"}),
@@ -67,7 +68,7 @@ func (p *SiteParser) Parse(ctx context.Context) ([]*News, error) {
 
 		newsParsed.Inc()
 
-		exist, err := p.Store.Exist(ctx, item.Title)
+		exist, err := p.store.Exist(ctx, item.Title)
 		if err != nil {
 			return nil, err
 		}
@@ -88,7 +89,7 @@ func (p *SiteParser) Parse(ctx context.Context) ([]*News, error) {
 			continue
 		}
 
-		if err = p.Store.Insert(ctx, n); err != nil {
+		if err = p.store.Insert(ctx, n); err != nil {
 			Lgr.Logf("[ERROR] saving: item=%v, err=%v", item, err)
 			continue
 		}
@@ -101,7 +102,7 @@ func (p *SiteParser) Parse(ctx context.Context) ([]*News, error) {
 }
 
 func (p *SiteParser) MergeWithUnpublished(ctx context.Context, items []*News) ([]*News, error) {
-	unpublished, err := p.Store.GetUnpublished(ctx)
+	unpublished, err := p.store.GetUnpublished(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -121,6 +122,10 @@ func (p *SiteParser) MergeWithUnpublished(ctx context.Context, items []*News) ([
 		forPublishing = append(forPublishing, item)
 	}
 	return forPublishing, nil
+}
+
+func (p *SiteParser) SetPosted(ctx context.Context, item *News) error {
+	return p.store.SetPosted(ctx, item.Title)
 }
 
 func parseItem(item *gofeed.Item) (*News, error) {

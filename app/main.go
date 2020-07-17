@@ -119,6 +119,9 @@ func work(b *TelegramBot, p *SiteParser) {
 			Lgr.Logf("[ERROR] send news: %w", err)
 			continue
 		}
+		if err := p.SetPosted(ctx, item); err != nil {
+			Lgr.Logf("[ERROR] can't set posted: item=%v, err=%w", item, err)
+		}
 
 		Lgr.Logf("[INFO] Item was send [%s]", item.Title)
 

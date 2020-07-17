@@ -10,26 +10,30 @@ import (
 
 const (
 	driver      = "postgres"
-	insertQuery = `		INSERT INTO public.news(title, playlist, date_time, imageurl, downloadurl, pageurl) 
-						VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`
+	insertQuery = `			INSERT INTO public.news(title, playlist, date_time, imageurl, downloadurl, pageurl, posted) 
+							VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`
 
-	selectNotified = `	SELECT id, title, playlist, imageurl, date_time, downloadurl
-						FROM public.news
-						WHERE notified = false
-						  AND title NOT LIKE '%Single%'
-						  AND title NOT LIKE '%single%'
-						  AND date_time > now() - interval '1 week'
-						ORDER BY date_time`
+	selectNotified = `		SELECT id, title, playlist, imageurl, date_time, downloadurl
+							FROM public.news
+							WHERE notified = false
+							  AND title NOT LIKE '%Single%'
+							  AND title NOT LIKE '%single%'
+							  AND date_time > now() - interval '1 week'
+							ORDER BY date_time`
 
-	updateNotified = `	UPDATE news 
-						SET notified = true 
-						WHERE id = $1`
+	updateNotified = `		UPDATE news 
+							SET notified = true 
+							WHERE id = $1`
 
 	selectUnpublished = `	SELECT id, title, playlist, imageurl, date_time, downloadurl
 							FROM public.news
 							WHERE posted = false
 							  AND date_time > now() - interval '1 week'
 							ORDER BY date_time`
+
+	updatePosted = `		UPDATE news 
+							SET posted = true 
+							WHERE title = $1`
 )
 
 // News is an article structure
@@ -69,7 +73,7 @@ func (s *Store) Exist(ctx context.Context, title string) (bool, error) {
 
 func (s *Store) Insert(ctx context.Context, n *News) error {
 	var userID int
-	row := s.conn.QueryRowContext(ctx, insertQuery, n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0], n.PageLink)
+	row := s.conn.QueryRowContext(ctx, insertQuery, n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0], n.PageLink, false)
 	if err := row.Scan(&userID); err != nil {
 		return err
 	}
@@ -152,4 +156,19 @@ func (s *Store) GetUnpublished(ctx context.Context) (map[string]*News, error) {
 		unpublished[n.Title] = n
 	}
 	return unpublished, nil
+}
+
+func (s *Store) SetPosted(ctx context.Context, title string) error {
+	result, err := s.conn.ExecContext(ctx, updatePosted, title)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return fmt.Errorf("expected to affect 1 row, affected %d", rows)
+	}
+	return nil
 }
