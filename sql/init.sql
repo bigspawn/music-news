@@ -16,14 +16,14 @@ create table news
     posted                 boolean NOT NULL default true,
     path_to_file           varchar(255),
     real_file_download_url varchar(255),
-    notified               bool    NOT NULL default false
+--     notified               bool    NOT NULL default false
 );
 
 alter table news
     owner to "go-music";
 
--- alter table news
---     add column notified bool NOT NULL default false;
+alter table news
+    add column notified bool NOT NULL default false;
 
 alter table news
     add column created_at timestamp;
