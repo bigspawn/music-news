@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"net/url"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/prometheus/client_golang/prometheus"
@@ -58,11 +59,14 @@ func NewTelegramBotAPI(p *Options) (*TelegramBot, error) {
 func (b *TelegramBot) SendNews(_ context.Context, item *News) error {
 	Lgr.Logf("[INFO] send news %v", item)
 
+	pLink := url.QueryEscape(item.PageLink)
+	dLink := url.QueryEscape(item.DownloadLink[0])
+
 	msg := tgbotapi.NewMessage(b.ChatId, item.Title+"\n"+item.Text)
 	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("Site page", item.PageLink),
-			tgbotapi.NewInlineKeyboardButtonURL("Download", item.DownloadLink[0]),
+			tgbotapi.NewInlineKeyboardButtonURL("Site page", pLink),
+			tgbotapi.NewInlineKeyboardButtonURL("Download", dLink),
 		),
 	)
 	if _, err := b.BotAPI.Send(msg); err != nil {
@@ -92,7 +96,7 @@ func (b *TelegramBot) SendRelease(item *News, releaseLink string) error {
 		return err
 	}
 
-	msg := tgbotapi.NewMessage(b.ChatId, item.Title+"\n"+item.Text+"\nRelease album link: "+releaseLink)
+	msg := tgbotapi.NewMessage(b.ChatId, item.Title+"\n"+item.Text+"\nRelease album link: "+url.QueryEscape(releaseLink))
 	if _, err := b.BotAPI.Send(msg); err != nil {
 		return err
 	}
