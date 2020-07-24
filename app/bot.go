@@ -2,14 +2,14 @@ package main
 
 import (
 	"context"
-	"net"
-	"net/http"
-	"net/url"
-
+	"fmt"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"golang.org/x/net/proxy"
+	"net"
+	"net/http"
+	"net/url"
 )
 
 var (
@@ -59,16 +59,24 @@ func NewTelegramBotAPI(p *Options) (*TelegramBot, error) {
 func (b *TelegramBot) SendNews(_ context.Context, item *News) error {
 	Lgr.Logf("[INFO] send news %v", item)
 
-	pLink := url.QueryEscape(item.PageLink)
-	dLink := url.QueryEscape(item.DownloadLink[0])
+	pUrl, err := encodeQuery(item.PageLink)
+	if err != nil {
+		return err
+	}
 
-	msg := tgbotapi.NewMessage(b.ChatId, item.Title+"\n"+item.Text)
-	msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(
-		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonURL("Site page", pLink),
-			tgbotapi.NewInlineKeyboardButtonURL("Download", dLink),
-		),
-	)
+	msg := tgbotapi.MessageConfig{
+		BaseChat: tgbotapi.BaseChat{
+			ChatID:           b.ChatId,
+			ReplyToMessageID: 0,
+			ReplyMarkup: tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
+				tgbotapi.NewInlineKeyboardButtonURL("Site page", pUrl),
+				tgbotapi.NewInlineKeyboardButtonURL("Download", item.DownloadLink[0]),
+			)),
+		},
+		Text:                  fmt.Sprintf("%s\n%s", item.Title, item.Text),
+		DisableWebPagePreview: false,
+	}
+
 	if _, err := b.BotAPI.Send(msg); err != nil {
 		return err
 	}
@@ -96,7 +104,7 @@ func (b *TelegramBot) SendRelease(item *News, releaseLink string) error {
 		return err
 	}
 
-	msg := tgbotapi.NewMessage(b.ChatId, item.Title+"\n"+item.Text+"\nRelease album link: "+url.QueryEscape(releaseLink))
+	msg := tgbotapi.NewMessage(b.ChatId, item.Title+"\n"+item.Text+"\nRelease album link: "+releaseLink)
 	if _, err := b.BotAPI.Send(msg); err != nil {
 		return err
 	}
@@ -104,4 +112,13 @@ func (b *TelegramBot) SendRelease(item *News, releaseLink string) error {
 	newsNotified.Inc()
 
 	return nil
+}
+
+func encodeQuery(u string) (string, error) {
+	uu, e := url.Parse(u)
+	if e != nil {
+		return "", e
+	}
+	uu.RawQuery = uu.Query().Encode()
+	return uu.String(), nil
 }

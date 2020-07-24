@@ -17,7 +17,7 @@ const (
 	period       = 30 // minutes
 	notifyPeriod = 3  // hours
 
-	timeoutBetween = 10 * time.Second
+	timeoutBetween = 3 * time.Second
 	parsingTimeout = 5 * time.Minute
 	notifyTimeout  = 5 * time.Minute
 )

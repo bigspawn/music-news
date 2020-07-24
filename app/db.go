@@ -28,9 +28,9 @@ const (
 	selectUnpublished = `	SELECT id, title, playlist, imageurl, date_time, downloadurl, pageurl
 							FROM public.news
 							WHERE posted = false
-							  AND created_at > now() - interval '1 week'
-							  AND created_at < now() - interval '1 minute'
-							ORDER BY date_time`
+							  AND created_at > now() AT TIME ZONE 'Europe/Moscow' - interval '1 week'
+							  AND created_at < now() AT TIME ZONE 'Europe/Moscow' - interval '1 minute'
+							ORDER BY created_at;`
 
 	updatePosted = `		UPDATE news 
 							SET posted = true 

@@ -15,7 +15,7 @@ create table news
     title                  varchar(255),
     posted                 boolean NOT NULL default true,
     path_to_file           varchar(255),
-    real_file_download_url varchar(255),
+    real_file_download_url varchar(255)
 --     notified               bool    NOT NULL default false
 );
 
