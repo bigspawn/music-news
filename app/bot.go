@@ -66,8 +66,7 @@ func (b *TelegramBot) SendNews(_ context.Context, item *News) error {
 
 	msg := tgbotapi.MessageConfig{
 		BaseChat: tgbotapi.BaseChat{
-			ChatID:           b.ChatId,
-			ReplyToMessageID: 0,
+			ChatID: b.ChatId,
 			ReplyMarkup: tgbotapi.NewInlineKeyboardMarkup(tgbotapi.NewInlineKeyboardRow(
 				tgbotapi.NewInlineKeyboardButtonURL("Site page", pUrl),
 				tgbotapi.NewInlineKeyboardButtonURL("Download", item.DownloadLink[0]),
@@ -112,6 +111,38 @@ func (b *TelegramBot) SendRelease(item *News, releaseLink string) error {
 	newsNotified.Inc()
 
 	return nil
+}
+
+func (b *TelegramBot) SendReleaseWithButtons(item *News, releaseLink string, links map[Platform]string) error {
+	Lgr.Logf("[INFO] send release with links %v, %v", links, item)
+
+	if err := b.SendImage(nil, item); err != nil {
+		return err
+	}
+
+	var rows []tgbotapi.InlineKeyboardButton
+	for p, l := range links {
+		rows = append(rows, tgbotapi.NewInlineKeyboardButtonURL(string(p), l))
+	}
+
+	msg := tgbotapi.MessageConfig{
+		BaseChat: tgbotapi.BaseChat{
+			ChatID:      b.ChatId,
+			ReplyMarkup: tgbotapi.NewInlineKeyboardMarkup(rows),
+		},
+		Text:                  fmt.Sprintf("%s\n%s\n[Release album link](%s)", item.Title, item.Text, releaseLink),
+		DisableWebPagePreview: false,
+		ParseMode:             tgbotapi.ModeMarkdown,
+	}
+
+	if _, err := b.BotAPI.Send(msg); err != nil {
+		return err
+	}
+
+	newsSended.Inc()
+
+	return nil
+
 }
 
 func encodeQuery(u string) (string, error) {

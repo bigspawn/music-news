@@ -212,6 +212,50 @@ func (a *LinksApi) getLinkByiTunesID(_ context.Context, id string) (string, erro
 	return result.PageUrl, nil
 }
 
+func (a *LinksApi) GetSongLink(ctx context.Context, id string) (SongLinkResponse, error) {
+	u := url.Values{
+		"platform":    platform,
+		"type":        entity,
+		"id":          []string{id},
+		"key":         []string{a.key},
+		"userCountry": country,
+	}
+
+	resp, err := a.client.Get(songLinksUrl + u.Encode())
+	if err != nil {
+		return SongLinkResponse{}, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != 200 {
+		return SongLinkResponse{}, fmt.Errorf("bad response: %d %s", resp.StatusCode, resp.Status)
+	}
+
+	result := SongLinkResponse{}
+	if err = json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return SongLinkResponse{}, err
+	}
+	return result, nil
+}
+
+func (a *LinksApi) GetLinks(ctx context.Context, title string) (string, map[Platform]string, error) {
+	id, err := a.getIDiTunes(ctx, clearTitle(title))
+	if err != nil {
+		return "", nil, err
+	}
+	resp, err := a.GetSongLink(ctx, id)
+	if err != nil {
+		return "", nil, err
+	}
+	links := make(map[Platform]string, len(resp.LinksByPlatform))
+	for p, l := range resp.LinksByPlatform {
+		if l.Url != "" {
+			links[p] = l.Url
+		}
+	}
+	return resp.PageUrl, links, nil
+}
+
 func clearTitle(title string) string {
 	title = unusedSuffixRegexp.ReplaceAllString(title, "")
 	title = strings.TrimSpace(title)
