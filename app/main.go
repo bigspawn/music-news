@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"net/http"
 	"time"
 
@@ -112,12 +113,14 @@ func work(b *TelegramBot, p *SiteParser) {
 	for _, item := range items {
 		time.Sleep(timeoutBetween)
 
-		if err := b.SendImage(ctx, item); err != nil {
+		id, err := b.SendImage(ctx, item)
+		if err != nil {
 			Lgr.Logf("[ERROR] send image: %v", err)
 			continue
 		}
 		if err := b.SendNews(ctx, item); err != nil {
 			Lgr.Logf("[ERROR] send news: %v", err)
+			_, _ = b.BotAPI.DeleteMessage(tgbotapi.NewDeleteMessage(b.ChatId, id))
 			continue
 		}
 		if err := p.SetPosted(ctx, item); err != nil {
