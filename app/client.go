@@ -217,8 +217,11 @@ func (a *LinksApi) GetSongLink(ctx context.Context, id string) (SongLinkResponse
 		"platform":    platform,
 		"type":        entity,
 		"id":          []string{id},
-		"key":         []string{a.key},
 		"userCountry": country,
+	}
+
+	if a.key != "" {
+		u.Add("key", a.key)
 	}
 
 	resp, err := a.client.Get(songLinksUrl + u.Encode())

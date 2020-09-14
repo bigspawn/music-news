@@ -137,9 +137,9 @@ func (b *TelegramBot) SendReleaseWithButtons(item *News, releaseLink string, lin
 			ChatID:      b.ChatId,
 			ReplyMarkup: tgbotapi.NewInlineKeyboardMarkup(rows),
 		},
-		Text:                  fmt.Sprintf("%s\n%s\n[Release album link](%s)", item.Title, item.Text, releaseLink),
+		Text:                  fmt.Sprintf("%s\n%s\n<a href=\"%s\">Release album link</a>", item.Title, item.Text, releaseLink),
 		DisableWebPagePreview: false,
-		ParseMode:             tgbotapi.ModeMarkdown,
+		ParseMode:             tgbotapi.ModeHTML,
 	}
 
 	if _, err := b.BotAPI.Send(msg); err != nil {

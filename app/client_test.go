@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func Test_clearTitle(t *testing.T) {
 	tests := []struct {
@@ -74,4 +77,15 @@ func Test_clearTitle(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLinksApi_GetLinks(t *testing.T) {
+	t.Skip()
+	api := NewLinkApi("")
+	link, links, err := api.GetLinks(context.Background(), "RAD PITT - Flivid")
+	if err != nil {
+		t.Error(err)
+	}
+	t.Log(link)
+	t.Log(links)
 }
