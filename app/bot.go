@@ -86,26 +86,27 @@ func (b *TelegramBot) SendNews(_ context.Context, item *News) error {
 	return nil
 }
 
-func (b *TelegramBot) SendImage(_ context.Context, n *News) error {
+func (b *TelegramBot) SendImage(_ context.Context, n *News) (int, error) {
 	Lgr.Logf("[INFO] send image %v", n)
 
-	photo := tgbotapi.NewPhotoShare(b.ChatId, n.ImageLink)
-
-	if _, err := b.BotAPI.Send(photo); err != nil {
-		return err
+	msg, err := b.BotAPI.Send(tgbotapi.NewPhotoShare(b.ChatId, n.ImageLink))
+	if err != nil {
+		return 0, err
 	}
-	return nil
+	return msg.MessageID, nil
 }
 
 func (b *TelegramBot) SendRelease(item *News, releaseLink string) error {
 	Lgr.Logf("[INFO] send release link %s, %v", releaseLink, item)
 
-	if err := b.SendImage(nil, item); err != nil {
+	id, err := b.SendImage(nil, item)
+	if err != nil {
 		return err
 	}
 
 	msg := tgbotapi.NewMessage(b.ChatId, item.Title+"\n"+item.Text+"\nRelease album link: "+releaseLink)
 	if _, err := b.BotAPI.Send(msg); err != nil {
+		_, _ = b.BotAPI.DeleteMessage(tgbotapi.NewDeleteMessage(b.ChatId, id))
 		return err
 	}
 
@@ -117,7 +118,8 @@ func (b *TelegramBot) SendRelease(item *News, releaseLink string) error {
 func (b *TelegramBot) SendReleaseWithButtons(item *News, releaseLink string, links map[Platform]string) error {
 	Lgr.Logf("[INFO] send release with links %v, %v", links, item)
 
-	if err := b.SendImage(nil, item); err != nil {
+	id, err := b.SendImage(nil, item)
+	if err != nil {
 		return err
 	}
 
@@ -141,6 +143,7 @@ func (b *TelegramBot) SendReleaseWithButtons(item *News, releaseLink string, lin
 	}
 
 	if _, err := b.BotAPI.Send(msg); err != nil {
+		_, _ = b.BotAPI.DeleteMessage(tgbotapi.NewDeleteMessage(b.ChatId, id))
 		return err
 	}
 
