@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sort"
 )
 
 var (
@@ -124,6 +125,10 @@ func (b *TelegramBot) SendReleaseWithButtons(item *News, releaseLink string, lin
 	for p, l := range links {
 		rows = append(rows, tgbotapi.NewInlineKeyboardButtonURL(string(p), l))
 	}
+
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i].Text > rows[j].Text
+	})
 
 	msg := tgbotapi.MessageConfig{
 		BaseChat: tgbotapi.BaseChat{

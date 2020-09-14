@@ -73,7 +73,9 @@ func validatePlatforms(byPlatform map[Platform]string) (map[Platform]string, err
 			links[p] = l
 			continue
 		}
-		return nil, fmt.Errorf("link for platform=%s not found", p)
+		if p == TidalPlatform || p == SpotifyPlatform || p == ItunesPlatform {
+			return nil, fmt.Errorf("link for platform=%s not found", p)
+		}
 	}
 	return links, nil
 }
