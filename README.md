@@ -1,6 +1,6 @@
 # music-news
 
-It consists of two services.
+This project consists two services.
 
 First, parse rss feed, save in Postgres, then send news into the Telegram channel.
 
