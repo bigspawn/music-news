@@ -5,6 +5,7 @@ import (
 	"github.com/go-pkgz/lgr"
 	"github.com/mmcdole/gofeed"
 	"github.com/stretchr/testify/require"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -12,13 +13,13 @@ import (
 func TestGetMetalParser_Parse(t *testing.T) {
 	t.Skip()
 
-	feed, err := gofeed.NewParser().Parse(strings.NewReader(rssExample))
+	feed, err := gofeed.NewParser().Parse(strings.NewReader(alterportalRss))
 	require.NoError(t, err)
 
 	//feed, err := gofeed.NewParser().ParseURL(rssFeed)
 	//require.NoError(t, err)
 
-	p := NewAlterportalParser(lgr.New())
+	p := NewAlterportalParser(lgr.New(), http.DefaultClient)
 	ctx := context.Background()
 	for _, i := range feed.Items {
 		result, err := p.Parse(ctx, i)
@@ -32,7 +33,7 @@ func TestGetMetalParser_Parse(t *testing.T) {
 	}
 }
 
-const rssExample = `
+const alterportalRss = `
 <?xml version="1.0" encoding="utf-8"?>
 <rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:media="http://search.yahoo.com/mrss/" xmlns:turbo="http://turbo.yandex.ru" version="2.0">
 <channel>

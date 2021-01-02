@@ -11,19 +11,16 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 )
 
-const rssFeed = "https://alterportal.net/rss.xml"
+const AlterportalRSSFeedURL = "https://alterportal.net/rss.xml"
 
 var newLinesRE = regexp.MustCompile("\n{2,}")
 
-func NewAlterportalParser(lgr lgr.L) *AlterportalParser {
+func NewAlterportalParser(lgr lgr.L, client *http.Client) *AlterportalParser {
 	return &AlterportalParser{
-		lgr: lgr,
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		lgr:    lgr,
+		client: client,
 	}
 }
 
@@ -208,8 +205,8 @@ func isSkippedGender(data string) bool {
 }
 
 var skipGenders = []string{
-	"Retro Pop", "R&B", "Pop Music", "Pop Rock", "City Pop", "Disco", "Eurodance",
-	"retro pop", "r&b", "pop music", "pop rock", "city pop", "disco", "eurodance",
+	"Retro Pop", "R&B", "Pop Music", "Pop Rock", "City Pop", "Disco", "Eurodance", "Hip-Hop",
+	"retro pop", "r&b", "pop music", "pop rock", "city pop", "disco", "eurodance", "hip-hop",
 }
 
 func isAllowedFileHost(host string) bool {
@@ -232,4 +229,5 @@ var fileHosts = []string{
 	"yadi.sk",
 	"files.fm",
 	"uppit.com",
+	"filecrypt.cc",
 }

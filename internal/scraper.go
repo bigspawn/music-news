@@ -42,13 +42,6 @@ func (s scraper) Scrape(ctx context.Context) error {
 		return nil
 	}
 
-	unpublished, err := s.store.GetUnpublished(ctx)
-	if err != nil {
-		return err
-	}
-
-	Merge(items, unpublished)
-
 	for _, item := range items {
 		if err := s.store.Insert(ctx, item); err != nil {
 			s.lgr.Logf("[ERROR] insert to db: %v", err)
@@ -77,6 +70,14 @@ func (s scraper) Scrape(ctx context.Context) error {
 
 		s.lgr.Logf("[INFO] item was send [%s]", item.Title)
 	}
+
+	//unpublished, err := s.store.GetUnpublished(ctx)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//Merge(items, unpublished)
+
 	return nil
 }
 
