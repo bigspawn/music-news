@@ -10,6 +10,8 @@ import (
 )
 
 func TestGetMetalParser_Parse(t *testing.T) {
+	t.Skip()
+
 	feed, err := gofeed.NewParser().Parse(strings.NewReader(rssExample))
 	require.NoError(t, err)
 
