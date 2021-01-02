@@ -9,11 +9,14 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/html"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 )
 
 const rssFeed = "https://alterportal.net/rss.xml"
+
+var newLinesRE = regexp.MustCompile("\n{2,}")
 
 func NewAlterportalParser(lgr lgr.L) *AlterportalParser {
 	return &AlterportalParser{
@@ -38,6 +41,7 @@ func (g AlterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 	news := &News{
 		Title:    strings.TrimSpace(item.Title),
 		PageLink: item.Link,
+		DateTime: item.PublishedParsed,
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, item.Link, nil)
@@ -62,6 +66,11 @@ func (g AlterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
 		return nil, err
+	}
+
+	title := doc.Find("title").Text()
+	if strings.Contains(title, "502: Bad gateway") {
+		return nil, errSkipItem
 	}
 
 	content := doc.Find(".ftwo")
@@ -105,7 +114,29 @@ func (g AlterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 		return nil, errSkipItem
 	}
 
+	news.Text = translate(news.Text)
+	news.Text = newLinesRE.ReplaceAllString(news.Text, "\n")
+	news.Text = trimLast(news.Text)
+
 	return news, nil
+}
+
+func trimLast(text string) string {
+	re := regexp.MustCompile("^\\d{1,3}\\.")
+	lines := strings.Split(text, "\n")
+	var j int
+	for i := len(lines) - 1; i >= 0; i-- {
+		if re.MatchString(lines[i]) {
+			j = i
+			break
+		}
+	}
+	text = ""
+	for i := 0; i <= j; i++ {
+		text += lines[i]
+		text += "\n"
+	}
+	return text
 }
 
 func findText(node *html.Node, builder *strings.Builder) {
@@ -116,6 +147,11 @@ func findText(node *html.Node, builder *strings.Builder) {
 		data := strings.TrimSpace(node.Data)
 		if isSkippedWord(data) {
 			builder.WriteString(data)
+			builder.WriteString(" ")
+		}
+	}
+	if node.Type == html.ElementNode {
+		if node.Data == "br" {
 			builder.WriteString("\n")
 		}
 	}
@@ -127,8 +163,27 @@ func findText(node *html.Node, builder *strings.Builder) {
 	}
 }
 
+func translate(data string) string {
+	for k, v := range translateMap {
+		data = strings.ReplaceAll(data, k, v)
+	}
+	return data
+}
+
+var translateMap = map[string]string{
+	"Стиль":       "Genre",
+	"Страна":      "Country",
+	"Дата релиза": "Release",
+	"Год выпуска": "Release",
+	"Формат":      "Quality",
+	"Размер":      "Size",
+	"Треклист":    "Tracklist",
+	"Лейбл":       "Label",
+	"Качество":    "Quality",
+}
+
 func isSkippedWord(data string) bool {
-	if data == "" || data == "\n" {
+	if data == "" {
 		return false
 	}
 	if _, ok := skipWords[strings.ToLower(data)]; ok {

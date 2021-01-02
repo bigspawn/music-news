@@ -35,7 +35,7 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 
 	if opt.Notify {
 		linkApi := NewLinkApi(opt.SongAPIKey, lgr)
-		n := NewNotifier(store, bot, linkApi)
+		n := NewNotifier(store, bot, linkApi, lgr)
 		task := func() {
 			if err := n.Notify(ctx); err != nil {
 				lgr.Logf("[ERROR] notifier %v", err)

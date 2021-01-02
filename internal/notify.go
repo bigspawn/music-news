@@ -18,11 +18,12 @@ type Notifier struct {
 	lgr   lgr.L
 }
 
-func NewNotifier(s *Store, bot *TelegramBot, links *LinksApi) *Notifier {
+func NewNotifier(s *Store, bot *TelegramBot, links *LinksApi, lgr lgr.L) *Notifier {
 	return &Notifier{
 		store: s,
 		bot:   bot,
 		links: links,
+		lgr:   lgr,
 	}
 }
 
