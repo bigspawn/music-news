@@ -177,6 +177,8 @@ var translateMap = map[string]string{
 	"Треклист":    "Tracklist",
 	"Лейбл":       "Label",
 	"Качество":    "Quality",
+	"Исполнитель": "Artist",
+	"Альбом":      "Album",
 }
 
 func isSkippedWord(data string) bool {
