@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	parsingTimeout  = time.Minute
+	parsingTimeout  = 30 * time.Minute
 	postItemTimeout = 3 * time.Second
 )
 

@@ -17,19 +17,19 @@ const AlterportalRSSFeedURL = "https://alterportal.net/rss.xml"
 
 var newLinesRE = regexp.MustCompile("\n{2,}")
 
-func NewAlterportalParser(lgr lgr.L, client *http.Client) *AlterportalParser {
-	return &AlterportalParser{
+func NewAlterportalParser(lgr lgr.L, client *http.Client) ItemParser {
+	return &alterportalParser{
 		lgr:    lgr,
 		client: client,
 	}
 }
 
-type AlterportalParser struct {
+type alterportalParser struct {
 	lgr    lgr.L
 	client *http.Client
 }
 
-func (g AlterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error) {
+func (p alterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error) {
 	if strings.Contains(item.Link, "raznoe") ||
 		strings.Contains(item.Link, "video") ||
 		strings.Contains(item.Link, "neformat") {
@@ -51,7 +51,7 @@ func (g AlterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 	req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
 	req.Header.Add("Accept-Language", "en-US,en;q=0.8,ru-RU;q=0.5,ru;q=0.3")
 
-	res, err := g.client.Do(req)
+	res, err := p.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -68,6 +68,27 @@ func (g AlterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 
 	title := doc.Find("title").Text()
 	if strings.Contains(title, "502: Bad gateway") {
+		return nil, errSkipItem
+	}
+
+	isVideo := false
+	doc.Find(".full_title").
+		Find("a[href]").
+		Each(func(_ int, s *goquery.Selection) {
+			href, exists := s.Attr("href")
+			if !exists {
+				return
+			}
+
+			if href == "" {
+				return
+			}
+
+			if strings.HasPrefix(href, "https://alterportal.net/video") {
+				isVideo = true
+			}
+		})
+	if isVideo {
 		return nil, errSkipItem
 	}
 
@@ -97,7 +118,7 @@ func (g AlterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 	if len(news.DownloadLink) == 0 {
 		cntHtml, err := content.Html()
 		if err == nil {
-			g.lgr.Logf("[ERROR] download links not found: %s", cntHtml)
+			p.lgr.Logf("[ERROR] download links not found: %s", cntHtml)
 		}
 		return nil, errSkipItem
 	}
@@ -236,4 +257,6 @@ var fileHosts = []string{
 	"files.fm",
 	"uppit.com",
 	"filecrypt.cc",
+	"turb.cc",
+	"turbobit.net",
 }

@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/go-pkgz/lgr"
@@ -12,21 +11,21 @@ import (
 	"strings"
 )
 
-const Music4newgenRSSFeedURL = "https://music4newgen.org/rss.xml"
+const GetRockMusicRss = "https://getrockmusic.net/rss.xml"
 
-func NewMusic4newgen(lgr lgr.L, client *http.Client) ItemParser {
-	return &m4ngParser{
+func NewGetRockMusicParser(lgr lgr.L, client *http.Client) ItemParser {
+	return &getRockMusicParser{
 		lgr:    lgr,
 		client: client,
 	}
 }
 
-type m4ngParser struct {
+type getRockMusicParser struct {
 	lgr    lgr.L
 	client *http.Client
 }
 
-func (p m4ngParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error) {
+func (p getRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error) {
 	news := &News{
 		Title:    strings.TrimSpace(item.Title),
 		PageLink: item.Link,
@@ -56,17 +55,12 @@ func (p m4ngParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error)
 	if err != nil {
 		return nil, err
 	}
+	content := doc.Find("#dle-content > div:nth-child(2)")
 
-	content := doc.Find(".full-story > table:nth-child(1) > tbody:nth-child(1) > tr:nth-child(1) > td:nth-child(1) > div:nth-child(2)")
-
-	imageLink, exists := content.Find("img[src]").Attr("src")
+	var exists bool
+	news.ImageLink, exists = content.Find("img[src]").Attr("src")
 	if !exists {
 		return nil, errors.New("image src not exists")
-	}
-
-	news.ImageLink = imageLink
-	if !strings.HasPrefix(news.ImageLink, "https") {
-		news.ImageLink = "https://music4newgen.org" + imageLink
 	}
 
 	content.Find("a[href]").Each(func(_ int, s *goquery.Selection) {
@@ -79,25 +73,18 @@ func (p m4ngParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error)
 			return
 		}
 
-		prefix := "https://music4newgen.org/index.php?do=go&url="
-		if strings.HasPrefix(href, prefix) {
-			href = strings.TrimPrefix(href, prefix)
-			index := strings.Index(href, "%")
-			if index != -1 {
-				href = href[:index]
-			}
-			bytes, err := base64.StdEncoding.DecodeString(href)
-			if err != nil {
-				p.lgr.Logf("[ERROR] decode base64 %w", err)
-			}
-			href = string(bytes)
-			href = strings.TrimSuffix(href, ".ht") + ".html"
-		}
-
 		if isAllowedFileHost(href) {
 			news.DownloadLink = append(news.DownloadLink, href)
 		}
 	})
+
+	if len(news.DownloadLink) == 0 {
+		cntHtml, err := content.Html()
+		if err == nil {
+			p.lgr.Logf("[ERROR] download links not found: %s", cntHtml)
+		}
+		return nil, errSkipItem
+	}
 
 	builder := &strings.Builder{}
 	for _, node := range content.Nodes {
@@ -111,6 +98,8 @@ func (p m4ngParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error)
 
 	news.Text = newLinesRE.ReplaceAllString(news.Text, "\n")
 	news.Text = trimLast(news.Text)
+
+	news.Text = news.Text[strings.Index(news.Text, "\n")+1:]
 
 	return news, nil
 }
