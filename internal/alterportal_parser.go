@@ -141,7 +141,7 @@ func (p alterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 }
 
 func trimLast(text string) string {
-	re := regexp.MustCompile("^\\d{1,3}\\.")
+	re := regexp.MustCompile("^\\d{1,3}[.\\s]*[\\s-–]")
 	lines := strings.Split(text, "\n")
 	var j int
 	for i := len(lines) - 1; i >= 0; i-- {
