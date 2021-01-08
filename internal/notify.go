@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-pkgz/lgr"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"time"
 )
 
@@ -49,8 +50,19 @@ func (n *Notifier) Notify(ctx context.Context) error {
 		}
 
 		if err := n.bot.SendReleaseWithButtons(item, releaseLink, links); err != nil {
-			n.lgr.Logf("[ERROR] sending: title=%s, err=%v", item.Title, err)
-			continue
+			if bErr, ok := err.(tgbotapi.Error); ok {
+				time.Sleep(time.Duration(bErr.RetryAfter) * time.Second)
+
+				err = n.bot.SendReleaseWithButtons(item, releaseLink, links)
+				if err != nil {
+					n.lgr.Logf("[ERROR] sending: title=%s, err=%v", item.Title, err)
+
+					continue
+				}
+			} else {
+				n.lgr.Logf("[ERROR] sending: title=%s, err=%v", item.Title, err)
+				continue
+			}
 		}
 
 		if err := n.store.UpdateNotifyFlag(ctx, item); err != nil {
