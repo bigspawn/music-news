@@ -31,7 +31,8 @@ type AlterportalParser struct {
 
 func (g AlterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error) {
 	if strings.Contains(item.Link, "raznoe") ||
-		strings.Contains(item.Link, "video") {
+		strings.Contains(item.Link, "video") ||
+		strings.Contains(item.Link, "neformat") {
 		return nil, errSkipItem
 	}
 
@@ -169,6 +170,7 @@ func translate(data string) string {
 
 var translateMap = map[string]string{
 	"Стиль":       "Genre",
+	"Cтиль":       "Genre",
 	"Страна":      "Country",
 	"Дата релиза": "Release",
 	"Год выпуска": "Release",
@@ -179,6 +181,7 @@ var translateMap = map[string]string{
 	"Качество":    "Quality",
 	"Исполнитель": "Artist",
 	"Альбом":      "Album",
+	"Дата Релиза": "Release",
 }
 
 func isSkippedWord(data string) bool {
@@ -209,6 +212,7 @@ func isSkippedGender(data string) bool {
 var skipGenders = []string{
 	"Retro Pop", "R&B", "Pop Music", "Pop Rock", "City Pop", "Disco", "Eurodance", "Hip-Hop",
 	"retro pop", "r&b", "pop music", "pop rock", "city pop", "disco", "eurodance", "hip-hop",
+	"Pop", "pop", "Rap / Hip Hop", "R'n'B",
 }
 
 func isAllowedFileHost(host string) bool {

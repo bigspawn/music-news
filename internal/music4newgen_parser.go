@@ -64,7 +64,10 @@ func (m m4ngParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error)
 		return nil, errors.New("image src not exists")
 	}
 
-	news.ImageLink = "https://music4newgen.org" + imageLink
+	news.ImageLink = imageLink
+	if !strings.HasPrefix(news.ImageLink, "https") {
+		news.ImageLink = "https://music4newgen.org" + imageLink
+	}
 
 	content.Find("a[href]").Each(func(_ int, s *goquery.Selection) {
 		href, exists := s.Attr("href")

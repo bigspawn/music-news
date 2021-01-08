@@ -50,18 +50,37 @@ func (s scraper) Scrape(ctx context.Context) error {
 	}
 
 	for _, item := range items {
-		time.Sleep(postItemTimeout)
-
 		id, err := s.bot.SendImage(ctx, item)
 		if err != nil {
-			s.lgr.Logf("[ERROR] send image: %v", err)
-			continue
+			if bErr, ok := err.(tgbotapi.Error); ok {
+				time.Sleep(time.Duration(bErr.RetryAfter) * time.Second)
+
+				id, err = s.bot.SendImage(ctx, item)
+				if err != nil {
+					s.lgr.Logf("[ERROR] send image: %v", err)
+					continue
+				}
+			} else {
+				s.lgr.Logf("[ERROR] send image: %v", err)
+				continue
+			}
 		}
 
 		if err := s.bot.SendNews(ctx, item); err != nil {
-			s.lgr.Logf("[ERROR] send news: %v", err)
-			_, _ = s.bot.BotAPI.DeleteMessage(tgbotapi.NewDeleteMessage(s.bot.ChatId, id))
-			continue
+			if bErr, ok := err.(tgbotapi.Error); ok {
+				time.Sleep(time.Duration(bErr.RetryAfter) * time.Second)
+
+				err = s.bot.SendNews(ctx, item)
+				if err != nil {
+					s.lgr.Logf("[ERROR] send news: %v", err)
+					_, _ = s.bot.BotAPI.DeleteMessage(tgbotapi.NewDeleteMessage(s.bot.ChatId, id))
+					continue
+				}
+			} else {
+				s.lgr.Logf("[ERROR] send news: %v", err)
+				_, _ = s.bot.BotAPI.DeleteMessage(tgbotapi.NewDeleteMessage(s.bot.ChatId, id))
+				continue
+			}
 		}
 
 		if err := s.store.SetPosted(ctx, item.Title); err != nil {
@@ -69,6 +88,8 @@ func (s scraper) Scrape(ctx context.Context) error {
 		}
 
 		s.lgr.Logf("[INFO] item was send [%s]", item.Title)
+
+		time.Sleep(postItemTimeout)
 	}
 
 	//unpublished, err := s.store.GetUnpublished(ctx)
