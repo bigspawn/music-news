@@ -51,7 +51,7 @@ func NewTelegramBotAPI(p *Options, lgr lgr.L) (*TelegramBot, error) {
 
 }
 
-func (b *TelegramBot) SendNews(_ context.Context, item *News) error {
+func (b *TelegramBot) SendNews(_ context.Context, item News) error {
 	b.lgr.Logf("[INFO] send news %v", item)
 
 	pUrl, err := encodeQuery(item.PageLink)
@@ -76,7 +76,7 @@ func (b *TelegramBot) SendNews(_ context.Context, item *News) error {
 	return nil
 }
 
-func (b *TelegramBot) SendImage(_ context.Context, n *News) (int, error) {
+func (b *TelegramBot) SendImage(_ context.Context, n News) (int, error) {
 	b.lgr.Logf("[INFO] send image %v", n)
 
 	msg, err := b.BotAPI.Send(tgbotapi.NewPhotoShare(b.ChatId, n.ImageLink))
@@ -86,7 +86,7 @@ func (b *TelegramBot) SendImage(_ context.Context, n *News) (int, error) {
 	return msg.MessageID, nil
 }
 
-func (b *TelegramBot) SendRelease(item *News, releaseLink string) error {
+func (b *TelegramBot) SendRelease(item News, releaseLink string) error {
 	b.lgr.Logf("[INFO] send release link %s, %v", releaseLink, item)
 
 	id, err := b.SendImage(nil, item)
@@ -102,7 +102,7 @@ func (b *TelegramBot) SendRelease(item *News, releaseLink string) error {
 	return nil
 }
 
-func (b *TelegramBot) SendReleaseWithButtons(item *News, releaseLink string, links map[Platform]string) error {
+func (b *TelegramBot) SendReleaseWithButtons(item News, releaseLink string, links map[Platform]string) error {
 	b.lgr.Logf("[INFO] send release with links %v, %v", links, item)
 
 	id, err := b.SendImage(nil, item)

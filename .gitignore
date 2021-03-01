@@ -15,7 +15,7 @@
 
 .idea
 .archive
-.run/
+.run
 
 docker-compose-*.yml
 sql/postgres_public_news_dump.sql

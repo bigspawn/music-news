@@ -83,7 +83,7 @@ func (s *Store) Exist(ctx context.Context, title string) (bool, error) {
 	return false, nil
 }
 
-func (s *Store) Insert(ctx context.Context, n *News) error {
+func (s *Store) Insert(ctx context.Context, n News) error {
 	var userID int
 
 	row := s.db.QueryRowContext(ctx, insertQuery,
@@ -98,7 +98,7 @@ func (s *Store) Insert(ctx context.Context, n *News) error {
 	return nil
 }
 
-func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]*News, error) {
+func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]News, error) {
 	rows, err := s.db.QueryContext(ctx, selectNotified)
 	if err != nil {
 		return nil, err
@@ -112,26 +112,25 @@ func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]*News, error) {
 		ImageLink    = new(string)
 		DownloadLink = new(string)
 		DateTime     = new(time.Time)
-		notifies     = make([]*News, 0)
+		notifies     = make([]News, 0)
 	)
 	for rows.Next() {
 		if err := rows.Scan(ID, Title, Text, ImageLink, DateTime, DownloadLink); err != nil {
 			return nil, err
 		}
-		n := &News{
+		notifies = append(notifies, News{
 			ID:           *ID,
 			Title:        *Title,
 			Text:         *Text,
 			ImageLink:    *ImageLink,
 			DownloadLink: strings.Split(*DownloadLink, ","),
 			DateTime:     DateTime,
-		}
-		notifies = append(notifies, n)
+		})
 	}
 	return notifies, nil
 }
 
-func (s *Store) UpdateNotifyFlag(ctx context.Context, item *News) error {
+func (s *Store) UpdateNotifyFlag(ctx context.Context, item News) error {
 	result, err := s.db.ExecContext(ctx, updateNotified, item.ID)
 	if err != nil {
 		return err
@@ -148,7 +147,7 @@ func (s *Store) UpdateNotifyFlag(ctx context.Context, item *News) error {
 	return nil
 }
 
-func (s *Store) GetUnpublished(ctx context.Context) (map[string]*News, error) {
+func (s *Store) GetUnpublished(ctx context.Context) (map[string]News, error) {
 	rows, err := s.db.QueryContext(ctx, selectUnpublished)
 	if err != nil {
 		return nil, err
@@ -163,13 +162,13 @@ func (s *Store) GetUnpublished(ctx context.Context) (map[string]*News, error) {
 		PageLink     = new(string)
 		DownloadLink = new(string)
 		DateTime     = new(time.Time)
-		unpublished  = make(map[string]*News)
+		unpublished  = make(map[string]News)
 	)
 	for rows.Next() {
 		if err := rows.Scan(ID, Title, Text, ImageLink, DateTime, DownloadLink, PageLink); err != nil {
 			return nil, err
 		}
-		n := &News{
+		n := News{
 			ID:           *ID,
 			Title:        *Title,
 			Text:         *Text,

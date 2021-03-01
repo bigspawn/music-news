@@ -2,11 +2,12 @@ package internal
 
 import (
 	"context"
+	"net/http"
+	"time"
+
 	"github.com/go-co-op/gocron"
 	"github.com/go-pkgz/lgr"
 	"github.com/pkg/errors"
-	"net/http"
-	"time"
 )
 
 type Options struct {
@@ -32,48 +33,60 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 		return nil, errors.Wrap(err, "init store")
 	}
 
-	scheduler := gocron.NewScheduler(time.Now().Location())
-	if opt.Notify {
-		createNotifier(ctx, opt, lgr, store, bot, scheduler)
-	} else {
-		if err := createScrapes(ctx, lgr, store, bot, scheduler); err != nil {
-			return nil, err
-		}
-	}
+	ch := make(chan []News)
 
-	return &App{
+	scheduler := gocron.NewScheduler(time.Now().Location())
+
+	app := &App{
 		store:     store,
 		lgr:       lgr,
 		scheduler: scheduler,
-	}, nil
+		ch:        ch,
+	}
+
+	if opt.Notify {
+		createNotifier(ctx, opt, lgr, store, bot, scheduler)
+		return app, nil
+	}
+
+	if err := createScrapes(ctx, lgr, store, bot, scheduler, ch); err != nil {
+		return nil, err
+	}
+	return app, nil
 }
 
 type App struct {
 	store     *Store
 	lgr       lgr.L
 	scheduler *gocron.Scheduler
+	ch        chan []News
 }
 
-func (a App) Start() {
+func (a *App) Start() {
 	a.scheduler.StartAsync()
 }
 
-func (a App) Stop() {
+func (a *App) Stop() {
 	if err := a.store.db.Close(); err != nil {
 		a.lgr.Logf("[ERROR] stopped application: %w", err)
 	}
 	a.scheduler.Stop()
 	a.scheduler.Clear()
+	close(a.ch)
 }
 
-func createScrapes(ctx context.Context, lgr lgr.L, store *Store, bot *TelegramBot, scheduler *gocron.Scheduler) error {
+func createScrapes(ctx context.Context, lgr lgr.L, store *Store, bot *TelegramBot, scheduler *gocron.Scheduler, ch chan []News) error {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
 	var interval uint64 = 30
 
+	publisher := NewPublisher(lgr, store, bot, ch)
+
+	go publisher.Start(ctx)
+
 	alterportalRssFeedParser := NewRssFeedParser(AlterportalRSSFeedURL, store, lgr, NewAlterportalParser(lgr, client))
-	alterportalScr := NewMusicScraper(bot, alterportalRssFeedParser, lgr, store)
+	alterportalScr := NewMusicScraper(alterportalRssFeedParser, lgr, ch)
 	alterportalJob := NewJob(alterportalScr, scheduler, "alterportal", lgr)
 	_, err := scheduler.Every(interval).Minutes().Do(alterportalJob.Do, ctx)
 	if err != nil {
@@ -81,7 +94,7 @@ func createScrapes(ctx context.Context, lgr lgr.L, store *Store, bot *TelegramBo
 	}
 
 	music4newgenRssFeedParser := NewRssFeedParser(Music4newgenRSSFeedURL, store, lgr, NewMusic4newgen(lgr, client))
-	music4newgenScr := NewMusicScraper(bot, music4newgenRssFeedParser, lgr, store)
+	music4newgenScr := NewMusicScraper(music4newgenRssFeedParser, lgr, ch)
 	music4newgenJob := NewJob(music4newgenScr, scheduler, "music4newgen", lgr)
 	_, err = scheduler.Every(interval+1).Minutes().Do(music4newgenJob.Do, ctx)
 	if err != nil {
@@ -89,7 +102,7 @@ func createScrapes(ctx context.Context, lgr lgr.L, store *Store, bot *TelegramBo
 	}
 
 	getrockmusicRssFeedParser := NewRssFeedParser(GetRockMusicRss, store, lgr, NewGetRockMusicParser(lgr, client))
-	getrockmusicScr := NewMusicScraper(bot, getrockmusicRssFeedParser, lgr, store)
+	getrockmusicScr := NewMusicScraper(getrockmusicRssFeedParser, lgr, ch)
 	getrockmusicJob := NewJob(getrockmusicScr, scheduler, "getrockmusic", lgr)
 	_, err = scheduler.Every(interval+1).Minutes().Do(getrockmusicJob.Do, ctx)
 	if err != nil {

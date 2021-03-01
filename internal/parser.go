@@ -13,32 +13,18 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mmcdole/gofeed"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
 	ExcludeWords     = []string{"Leaked\n"}
 	ExcludeLastWords = []string{"Download\n", "Downloads\n", "Total length:", "Download", "Support! Facebook / iTunes"}
 	ExcludeGenders   = []string{"pop", "rap", "folk", "synthpop", "r&b", "thrash metal", "J-Core", "R&amp;B"}
-
-	imageCssSelectorPath      = "html.wf-roboto-n3-active.wf-roboto-n4-active.wf-roboto-i4-active.wf-roboto-n7-active.wf-roboto-i3-active.wf-roboto-i7-active.wf-active body.ipsApp.ipsApp_front.ipsJS_has.ipsClearfix.ipsApp_noTouch main#ipsLayout_body.ipsLayout_container.v-nav-wrap div#ipsLayout_contentArea div#ipsLayout_contentWrapper div#ipsLayout_mainArea div.cTopic.ipsClear.ipsSpacer_top div.ipsAreaBackground_light form article#elComment_212133.cPost.ipsBox.ipsComment.ipsComment_parent.ipsClearfix.ipsClear.ipsColumns.ipsColumns_noSpacing.ipsColumns_collapsePhone div.ipsColumn.ipsColumn_fluid div#comment-212133_wrap.ipsComment_content.ipsType_medium.ipsFaded_withHover div.cPost_contentWrap.ipsPad div.ipsType_normal.ipsType_richText.ipsContained p a img.ipsImage"
-	imageCssSelectorPathThumb = imageCssSelectorPath + ".ipsImage_thumbnailed"
-	imgSelector               = "img.ipsImage.ipsImage_thumbnailed"
-	imgSelector2              = "img.ipsImage"
 )
 
-var (
-	newsParsed = promauto.NewCounter(prometheus.CounterOpts{
-		Name: "parsed_news_total",
-		Help: "The total number of parsed news",
-	})
-
-	errSkipItem = errors.New("skip item")
-)
+var errSkipItem = errors.New("skip item")
 
 type RssFeedParser interface {
-	Parse(ctx context.Context) ([]*News, error)
+	Parse(ctx context.Context) ([]News, error)
 }
 
 func NewRssFeedParser(url string, store *Store, lgr lgr.L, itemParser ItemParser) RssFeedParser {
@@ -59,13 +45,13 @@ type parser struct {
 	itemParser ItemParser
 }
 
-func (p parser) Parse(ctx context.Context) ([]*News, error) {
+func (p parser) Parse(ctx context.Context) ([]News, error) {
 	feed, err := p.feedParser.ParseURL(p.url)
 	if err != nil {
 		return nil, err
 	}
 
-	news := make([]*News, 0, len(feed.Items))
+	news := make([]News, 0, len(feed.Items))
 	for _, item := range feed.Items {
 		if item == nil {
 			continue
@@ -91,7 +77,7 @@ func (p parser) Parse(ctx context.Context) ([]*News, error) {
 			p.lgr.Logf("[ERROR] failed parsing: item=%v, err=%v", item, err)
 			continue
 		}
-		news = append(news, n)
+		news = append(news, *n)
 	}
 	return news, err
 }
@@ -153,15 +139,14 @@ func parseItem(item *gofeed.Item) (*News, error) {
 		return nil, fmt.Errorf("can't find image link: %v", err)
 	}
 
-	n := &News{
+	return &News{
 		Title:        item.Title,
 		DateTime:     item.PublishedParsed,
 		Text:         normalize(desc),
 		PageLink:     item.Link,
 		ImageLink:    imageLink,
 		DownloadLink: downloadLink,
-	}
-	return n, nil
+	}, nil
 }
 
 func extractDownload(doc *goquery.Document) ([]string, error) {
