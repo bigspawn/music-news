@@ -5,9 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-pkgz/lgr"
-	"net/http"
-	"net/url"
-	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -87,83 +84,6 @@ func (p parser) Parse(ctx context.Context) ([]News, error) {
 
 type ItemParser interface {
 	Parse(ctx context.Context, item *gofeed.Item) (*News, error)
-}
-
-func parseItem(item *gofeed.Item) (*News, error) {
-	u, err := url.Parse(item.Link)
-	if err != nil {
-		return nil, err
-	}
-
-	q, err := url.ParseQuery(u.RawQuery)
-	if err != nil {
-		return nil, err
-	}
-
-	var topic string
-	for k, _ := range q {
-		if strings.Contains(k, "/forums/topic/") {
-			topic = k
-			break
-		}
-	}
-	if topic == "" {
-		return nil, errors.New("empty topic")
-	}
-
-	u.RawQuery = topic
-	item.Link = u.String()
-
-	resp, err := http.Get(item.Link)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	re := regexp.MustCompile("[\\n\\t\\s]{2,}")
-	desc := re.ReplaceAllString(item.Description, "\n")
-
-	if containText(desc, ExcludeGenders) {
-		return nil, errSkipItem
-	}
-
-	downloadLink, err := extractDownload(doc)
-	if err != nil {
-		return nil, err
-	}
-
-	imageLink, err := extractImage(doc)
-	if err != nil {
-		return nil, fmt.Errorf("can't find image link: %v", err)
-	}
-
-	return &News{
-		Title:        item.Title,
-		DateTime:     item.PublishedParsed,
-		Text:         normalize(desc),
-		PageLink:     item.Link,
-		ImageLink:    imageLink,
-		DownloadLink: downloadLink,
-	}, nil
-}
-
-func extractDownload(doc *goquery.Document) ([]string, error) {
-	link := doc.
-		Find("div.ipsType_normal.ipsType_richText.ipsContained").
-		First().
-		Find("a[rel~='external']").
-		First()
-
-	val, exists := link.Attr("href")
-	if !exists {
-		return nil, errors.New("can't find download link")
-	}
-	return []string{val}, nil
 }
 
 func extractImage(document *goquery.Document) (string, error) {
