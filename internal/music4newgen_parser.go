@@ -88,7 +88,7 @@ func (p m4ngParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error)
 			}
 			bytes, err := base64.StdEncoding.DecodeString(href)
 			if err != nil {
-				p.lgr.Logf("[ERROR] decode base64 %w", err)
+				p.lgr.Logf("[WARN] decode base64 %w", err)
 			}
 			href = string(bytes)
 			href = strings.TrimSuffix(href, ".ht") + ".html"

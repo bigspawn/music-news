@@ -18,7 +18,10 @@ import (
 var (
 	ExcludeWords     = []string{"Leaked\n"}
 	ExcludeLastWords = []string{"Download\n", "Downloads\n", "Total length:", "Download", "Support! Facebook / iTunes"}
-	ExcludeGenders   = []string{"pop", "rap", "folk", "synthpop", "r&b", "thrash metal", "J-Core", "R&amp;B"}
+	ExcludeGenders   = []string{
+		"pop", "rap", "folk", "synthpop", "r&b", "thrash metal", "J-Core", "R&amp;B",
+		"Rockabilly", "Punkabilly",
+	}
 )
 
 var errSkipItem = errors.New("skip item")
