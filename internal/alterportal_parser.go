@@ -233,8 +233,10 @@ func isSkippedGender(data string) bool {
 var skipGenders = []string{
 	"Retro Pop", "R&B", "Pop Music", "Pop Rock", "City Pop", "Disco", "Eurodance", "Hip-Hop",
 	"retro pop", "r&b", "pop music", "pop rock", "city pop", "disco", "eurodance", "hip-hop",
-	"Pop", "pop", "Rap / Hip Hop", "R'n'B", "Dance / Electronic / House", "Rockabilly",
-	"Punkabilly", "rockabilly", "punkabilly",
+	"Pop", "pop", "Rap / Hip Hop", "R'n'B", "Dance / Electronic / House",
+	"Rockabilly", "rockabilly",
+	"Punkabilly", "punkabilly",
+	"Psychobilly", "psychobilly",
 }
 
 func isAllowedFileHost(host string) bool {
