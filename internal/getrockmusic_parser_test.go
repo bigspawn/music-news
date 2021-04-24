@@ -20,7 +20,7 @@ func Test_getRockMusicParser_Parse(t *testing.T) {
 	ctx := context.Background()
 	for _, i := range feed.Items {
 		result, err := p.Parse(ctx, i)
-		if err == errSkipItem {
+		if err == ErrSkipItem {
 			continue
 		}
 		if err != nil {

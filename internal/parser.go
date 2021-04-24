@@ -20,7 +20,7 @@ var (
 	ExcludeLastWords = []string{"Download\n", "Downloads\n", "Total length:", "Download", "Support! Facebook / iTunes"}
 )
 
-var errSkipItem = errors.New("skip item")
+var ErrSkipItem = errors.New("skip item")
 
 const siteLabel = "site"
 
@@ -84,9 +84,13 @@ func (p parser) Parse(ctx context.Context) ([]News, error) {
 
 		n, err := p.itemParser.Parse(ctx, item)
 		if err != nil {
-			if errors.Is(err, errSkipItem) {
+			if errors.Is(err, ErrSkipItem) {
 				p.lgr.Logf("[INFO] skip: title=%v, link=%s", item.Title, item.Link)
 				continue
+			}
+			if errors.Is(err, ErrAccountIsDisabled) {
+				p.lgr.Logf("[WARN] skip: %s: %w+", p.url, err)
+				return nil, nil
 			}
 
 			errorCounter.With(prometheus.Labels{siteLabel: p.siteLabel}).Inc()

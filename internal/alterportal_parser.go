@@ -33,7 +33,7 @@ func (p alterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 	if strings.Contains(item.Link, "raznoe") ||
 		strings.Contains(item.Link, "video") ||
 		strings.Contains(item.Link, "neformat") {
-		return nil, errSkipItem
+		return nil, ErrSkipItem
 	}
 
 	news := &News{
@@ -68,7 +68,7 @@ func (p alterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 
 	title := doc.Find("title").Text()
 	if strings.Contains(title, "502: Bad gateway") {
-		return nil, errSkipItem
+		return nil, ErrSkipItem
 	}
 
 	isVideo := false
@@ -89,7 +89,7 @@ func (p alterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 			}
 		})
 	if isVideo {
-		return nil, errSkipItem
+		return nil, ErrSkipItem
 	}
 
 	content := doc.Find(".ftwo")
@@ -120,7 +120,7 @@ func (p alterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 		if err == nil {
 			p.lgr.Logf("[ERROR] download links not found: %s", cntHtml)
 		}
-		return nil, errSkipItem
+		return nil, ErrSkipItem
 	}
 
 	builder := &strings.Builder{}
@@ -130,7 +130,7 @@ func (p alterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 	news.Text = builder.String()
 
 	if isSkippedGender(news.Text) {
-		return nil, errSkipItem
+		return nil, ErrSkipItem
 	}
 
 	news.Text = translate(news.Text)

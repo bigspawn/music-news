@@ -83,7 +83,7 @@ func (p getRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 		if err == nil {
 			p.lgr.Logf("[ERROR] download links not found: %s", cntHtml)
 		}
-		return nil, errSkipItem
+		return nil, ErrSkipItem
 	}
 
 	builder := &strings.Builder{}
@@ -93,7 +93,7 @@ func (p getRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 	news.Text = strings.TrimSpace(builder.String())
 
 	if isSkippedGender(news.Text) {
-		return nil, errSkipItem
+		return nil, ErrSkipItem
 	}
 
 	news.Text = newLinesRE.ReplaceAllString(news.Text, "\n")
