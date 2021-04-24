@@ -206,6 +206,8 @@ var translateMap = map[string]string{
 	"Исполнитель": "Artist",
 	"Альбом":      "Album",
 	"Дата Релиза": "Release",
+	"Дата выхода": "Release",
+	"Дата Выхода": "Release",
 }
 
 func needAddWord(data string) bool {
