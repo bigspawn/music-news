@@ -4,9 +4,9 @@ ENV GO111MODULE=on
 ENV CGO_ENABLED=0
 
 ADD . /build
-
+WORKDIR /build/internal
 RUN go mod download -x
-RUN go test -v -race ./internal
+RUN go test -v -race .
 
 WORKDIR /build/cmd
 RUN go build -o music-news .
