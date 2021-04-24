@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/go-pkgz/lgr"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"net/url"
 	"strings"
 	"unicode/utf8"
 
@@ -15,25 +18,36 @@ import (
 var (
 	ExcludeWords     = []string{"Leaked\n"}
 	ExcludeLastWords = []string{"Download\n", "Downloads\n", "Total length:", "Download", "Support! Facebook / iTunes"}
-	ExcludeGenders   = []string{
-		"pop", "rap", "folk", "synthpop", "r&b", "thrash metal", "J-Core", "R&amp;B",
-		"Rockabilly", "Punkabilly",
-	}
 )
 
 var errSkipItem = errors.New("skip item")
+
+const siteLabel = "site"
+
+var errorCounter = promauto.NewCounterVec(prometheus.CounterOpts{
+	Namespace: "music_news",
+	Subsystem: "parser",
+	Name:      "parsed_error_total",
+	Help:      "Total count of parsed item errors",
+}, []string{siteLabel})
 
 type RssFeedParser interface {
 	Parse(ctx context.Context) ([]News, error)
 }
 
-func NewRssFeedParser(url string, store *Store, lgr lgr.L, itemParser ItemParser) RssFeedParser {
+func NewRssFeedParser(rssHost string, store *Store, lgr lgr.L, itemParser ItemParser) RssFeedParser {
+	link, err := url.Parse(rssHost)
+	if err != nil {
+		lgr.Logf("[FATAL] %w+", err)
+	}
+
 	return &parser{
-		url:        url,
+		url:        rssHost,
 		feedParser: gofeed.NewParser(),
 		store:      store,
 		lgr:        lgr,
 		itemParser: itemParser,
+		siteLabel:  link.Host,
 	}
 }
 
@@ -43,6 +57,7 @@ type parser struct {
 	store      *Store
 	lgr        lgr.L
 	itemParser ItemParser
+	siteLabel  string
 }
 
 func (p parser) Parse(ctx context.Context) ([]News, error) {
@@ -73,6 +88,8 @@ func (p parser) Parse(ctx context.Context) ([]News, error) {
 				p.lgr.Logf("[INFO] skip: title=%v, link=%s", item.Title, item.Link)
 				continue
 			}
+
+			errorCounter.With(prometheus.Labels{siteLabel: p.siteLabel}).Inc()
 
 			p.lgr.Logf("[ERROR] failed parsing: item=%v, err=%v", item, err)
 			continue

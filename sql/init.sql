@@ -20,7 +20,7 @@ create table news
 );
 
 alter table news
-    owner to "go-music";
+    owner to "postgres";
 
 alter table news
     add column notified bool NOT NULL default false;

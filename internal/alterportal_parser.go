@@ -127,7 +127,7 @@ func (p alterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 	for _, node := range content.Nodes {
 		findText(node, builder)
 	}
-	news.Text = strings.TrimSpace(builder.String())
+	news.Text = builder.String()
 
 	if isSkippedGender(news.Text) {
 		return nil, errSkipItem
@@ -135,7 +135,10 @@ func (p alterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 
 	news.Text = translate(news.Text)
 	news.Text = newLinesRE.ReplaceAllString(news.Text, "\n")
+	news.Text = strings.ReplaceAll(news.Text, "[ ] \n", "")
+	news.Text = strings.ReplaceAll(news.Text, ":: ", "")
 	news.Text = trimLast(news.Text)
+	news.Text = strings.TrimSpace(news.Text)
 
 	return news, nil
 }
@@ -164,7 +167,7 @@ func findText(node *html.Node, builder *strings.Builder) {
 	}
 	if node.Type == html.TextNode {
 		data := strings.TrimSpace(node.Data)
-		if isSkippedWord(data) {
+		if needAddWord(data) {
 			builder.WriteString(data)
 			builder.WriteString(" ")
 		}
@@ -205,7 +208,7 @@ var translateMap = map[string]string{
 	"Дата Релиза": "Release",
 }
 
-func isSkippedWord(data string) bool {
+func needAddWord(data string) bool {
 	if data == "" {
 		return false
 	}

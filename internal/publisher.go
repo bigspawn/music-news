@@ -40,13 +40,6 @@ func (p *Publisher) Start(ctx context.Context) {
 
 func (p *Publisher) publish(ctx context.Context, items []News) error {
 	for _, item := range items {
-		if err := p.store.Insert(ctx, item); err != nil {
-			p.lgr.Logf("[ERROR] insert to db: %v", err)
-			continue
-		}
-	}
-
-	for _, item := range items {
 		id, err := p.bot.SendImage(ctx, item)
 		if err != nil {
 			if bErr, ok := err.(tgbotapi.Error); ok {

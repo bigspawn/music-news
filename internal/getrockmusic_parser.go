@@ -55,14 +55,14 @@ func (p getRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 	if err != nil {
 		return nil, err
 	}
-	content := doc.Find("#dle-content > div:nth-child(2)")
 
 	var exists bool
-	news.ImageLink, exists = content.Find("img[src]").Attr("src")
+	news.ImageLink, exists = doc.Find(".fscover").Find("img[src]").Attr("src")
 	if !exists {
 		return nil, errors.New("image src not exists")
 	}
 
+	content := doc.Find("div.generalblock:nth-child(3)")
 	content.Find("a[href]").Each(func(_ int, s *goquery.Selection) {
 		href, exists := s.Attr("href")
 		if !exists {

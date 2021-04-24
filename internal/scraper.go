@@ -15,11 +15,17 @@ type MusicScraper interface {
 	Scrape(ctx context.Context) error
 }
 
-func NewMusicScraper(parser RssFeedParser, lgr lgr.L, ch chan<- []News) MusicScraper {
+func NewMusicScraper(
+	parser RssFeedParser,
+	lgr lgr.L,
+	ch chan<- []News,
+	s *Store,
+) MusicScraper {
 	return &scraper{
 		parser: parser,
 		lgr:    lgr,
 		ch:     ch,
+		store:  s,
 	}
 }
 
@@ -27,6 +33,7 @@ type scraper struct {
 	parser RssFeedParser
 	lgr    lgr.L
 	ch     chan<- []News
+	store  *Store
 }
 
 func (s scraper) Scrape(ctx context.Context) error {
@@ -37,6 +44,13 @@ func (s scraper) Scrape(ctx context.Context) error {
 	if err != nil {
 		s.lgr.Logf("[ERROR] can't parse: err=%v", err)
 		return nil
+	}
+
+	for _, item := range items {
+		if err := s.store.Insert(ctx, item); err != nil {
+			s.lgr.Logf("[ERROR] insert to db: %v", err)
+			continue
+		}
 	}
 
 	go func() {

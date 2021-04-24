@@ -1,41 +1,17 @@
-version: '3'
-
+version: "3"
 services:
-  music-news:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: bigspawn/music-news:prod
-    container_name: music-news-prod
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    environment:
-#      USER:
-#      PASSWD:
-#      PROXY_URL:
-      BOT_ID:
-      CHAT_ID:
-      DB_URL:
-      FEED_URL: https://kingdom-leaks.com/index.php?/rss/3-the-kingdom-leaks-everything-feed.xml
-
-  postgres-db:
-    image: postgres:alpine
-    container_name: postgres-db-prod
-    restart: always
+  postgres:
+    image: postgres:13-alpine
+    container_name: postgresdb
+    restart: unless-stopped
     logging:
       driver: json-file
       options:
         max-size: "10m"
         max-file: "5"
     ports:
-      - "15432:5432"
+      - 15432:5432
     environment:
-      POSTGRES_USER:
-      POSTGRES_PASSWORD:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
       PGDATA: /var/lib/postgresql/data/pgdata
-    volumes:
-      - ./postgresql/data/pgdata:/var/lib/postgresql/data/pgdata
-

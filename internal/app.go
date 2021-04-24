@@ -14,7 +14,6 @@ type Options struct {
 	User       string `long:"user" env:"USER"`
 	Passwd     string `long:"passwd" env:"PASSWD"`
 	ProxyURL   string `long:"proxy_url" env:"PROXY_URL"`
-	FeedURL    string `short:"f" long:"feed_url" env:"FEED_URL"`
 	Notify     bool   `short:"n" long:"notify" env:"NOTIFY"`
 	BotID      string `short:"b" long:"bot_id" env:"BOT_ID" required:"true"`
 	ChatID     int64  `short:"c" long:"chat_id" env:"CHAT_ID" required:"true"`
@@ -45,7 +44,10 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 	}
 
 	if opt.Notify {
-		createNotifier(ctx, opt, lgr, store, bot, scheduler)
+		err := createNotifier(ctx, opt, lgr, store, bot, scheduler)
+		if err != nil {
+			return nil, err
+		}
 		return app, nil
 	}
 
@@ -75,26 +77,35 @@ func (a *App) Stop() {
 	close(a.ch)
 }
 
-func createScrapes(ctx context.Context, lgr lgr.L, store *Store, bot *TelegramBot, scheduler *gocron.Scheduler, ch chan []News) error {
+func createScrapes(
+	ctx context.Context,
+	lgr lgr.L,
+	store *Store,
+	bot *TelegramBot,
+	scheduler *gocron.Scheduler,
+	ch chan []News,
+) error {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
-	var interval uint64 = 30
 
 	publisher := NewPublisher(lgr, store, bot, ch)
 
 	go publisher.Start(ctx)
 
+	var interval uint64 = 30
+	var err error
+
 	alterportalRssFeedParser := NewRssFeedParser(AlterportalRSSFeedURL, store, lgr, NewAlterportalParser(lgr, client))
-	alterportalScr := NewMusicScraper(alterportalRssFeedParser, lgr, ch)
+	alterportalScr := NewMusicScraper(alterportalRssFeedParser, lgr, ch, store)
 	alterportalJob := NewJob(alterportalScr, scheduler, "alterportal", lgr)
-	_, err := scheduler.Every(interval).Minutes().Do(alterportalJob.Do, ctx)
+	_, err = scheduler.Every(interval).Minutes().Do(alterportalJob.Do, ctx)
 	if err != nil {
 		return err
 	}
 
 	music4newgenRssFeedParser := NewRssFeedParser(Music4newgenRSSFeedURL, store, lgr, NewMusic4newgen(lgr, client))
-	music4newgenScr := NewMusicScraper(music4newgenRssFeedParser, lgr, ch)
+	music4newgenScr := NewMusicScraper(music4newgenRssFeedParser, lgr, ch, store)
 	music4newgenJob := NewJob(music4newgenScr, scheduler, "music4newgen", lgr)
 	_, err = scheduler.Every(interval+1).Minutes().Do(music4newgenJob.Do, ctx)
 	if err != nil {
@@ -102,7 +113,7 @@ func createScrapes(ctx context.Context, lgr lgr.L, store *Store, bot *TelegramBo
 	}
 
 	getrockmusicRssFeedParser := NewRssFeedParser(GetRockMusicRss, store, lgr, NewGetRockMusicParser(lgr, client))
-	getrockmusicScr := NewMusicScraper(getrockmusicRssFeedParser, lgr, ch)
+	getrockmusicScr := NewMusicScraper(getrockmusicRssFeedParser, lgr, ch, store)
 	getrockmusicJob := NewJob(getrockmusicScr, scheduler, "getrockmusic", lgr)
 	_, err = scheduler.Every(interval+1).Minutes().Do(getrockmusicJob.Do, ctx)
 	if err != nil {
@@ -112,18 +123,22 @@ func createScrapes(ctx context.Context, lgr lgr.L, store *Store, bot *TelegramBo
 	return nil
 }
 
-func createNotifier(ctx context.Context, opt *Options, lgr lgr.L, store *Store, bot *TelegramBot, scheduler *gocron.Scheduler) {
+func createNotifier(ctx context.Context, opt *Options, lgr lgr.L, store *Store, bot *TelegramBot,
+	scheduler *gocron.Scheduler) error {
+
 	linkApi := NewLinkApi(opt.SongAPIKey, lgr)
-	n := NewNotifier(store, bot, linkApi, lgr)
-	task := func() {
-		if err := n.Notify(ctx); err != nil {
+	notifier := NewNotifier(store, bot, linkApi, lgr)
+
+	_, err := scheduler.Every(3).Hour().Do(func() {
+		if err := notifier.Notify(ctx); err != nil {
 			lgr.Logf("[ERROR] notifier %v", err)
 		}
 
 		_, next := scheduler.NextRun()
 		lgr.Logf("[INFO] job next start %s", next)
-	}
-	scheduler.Every(3).Hour().Do(task)
+	})
+
+	return err
 }
 
 func NewJob(s MusicScraper, sch *gocron.Scheduler, name string, lgr lgr.L) *Job {
