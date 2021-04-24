@@ -1,4 +1,4 @@
-FROM golang:1.15 as test
+FROM golang:1.16 as test
 
 ENV GO111MODULE=on
 
@@ -10,7 +10,7 @@ RUN go test -v -race .
 
 
 
-FROM golang:1.15-alpine as build
+FROM golang:1.16-alpine as build
 
 ENV GO111MODULE=on
 ENV CGO_ENABLED=0
@@ -23,7 +23,7 @@ RUN go mod download
 RUN go build -o music-news .
 
 
-FROM golang:1.15-alpine
+FROM golang:1.16-alpine
 
 WORKDIR /srv
 
