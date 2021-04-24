@@ -94,13 +94,13 @@ func createScrapes(
 	go publisher.Start(ctx)
 
 	var err error
-	alterportalRssFeedParser := NewRssFeedParser(AlterportalRSSFeedURL, store, lgr, NewAlterportalParser(lgr, client))
-	alterportalScr := NewMusicScraper(alterportalRssFeedParser, lgr, ch, store)
-	alterportalJob := NewJob(alterportalScr, scheduler, "alterportal", lgr)
-	_, err = scheduler.Every(30).Minutes().Do(alterportalJob.Do, ctx)
-	if err != nil {
-		return err
-	}
+	//alterportalRssFeedParser := NewRssFeedParser(AlterportalRSSFeedURL, store, lgr, NewAlterportalParser(lgr, client))
+	//alterportalScr := NewMusicScraper(alterportalRssFeedParser, lgr, ch, store)
+	//alterportalJob := NewJob(alterportalScr, scheduler, "alterportal", lgr)
+	//_, err = scheduler.Every(30).Minutes().Do(alterportalJob.Do, ctx)
+	//if err != nil {
+	//	return err
+	//}
 
 	music4newgenRssFeedParser := NewRssFeedParser(Music4newgenRSSFeedURL, store, lgr, NewMusic4newgen(lgr, client))
 	music4newgenScr := NewMusicScraper(music4newgenRssFeedParser, lgr, ch, store)
@@ -110,13 +110,13 @@ func createScrapes(
 		return err
 	}
 
-	getrockmusicRssFeedParser := NewRssFeedParser(GetRockMusicRss, store, lgr, NewGetRockMusicParser(lgr, client))
-	getrockmusicScr := NewMusicScraper(getrockmusicRssFeedParser, lgr, ch, store)
-	getrockmusicJob := NewJob(getrockmusicScr, scheduler, "getrockmusic", lgr)
-	_, err = scheduler.Every(32).Minutes().Do(getrockmusicJob.Do, ctx)
-	if err != nil {
-		return err
-	}
+	//getrockmusicRssFeedParser := NewRssFeedParser(GetRockMusicRss, store, lgr, NewGetRockMusicParser(lgr, client))
+	//getrockmusicScr := NewMusicScraper(getrockmusicRssFeedParser, lgr, ch, store)
+	//getrockmusicJob := NewJob(getrockmusicScr, scheduler, "getrockmusic", lgr)
+	//_, err = scheduler.Every(32).Minutes().Do(getrockmusicJob.Do, ctx)
+	//if err != nil {
+	//	return err
+	//}
 
 	return nil
 }

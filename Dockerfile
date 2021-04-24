@@ -1,32 +1,19 @@
-FROM golang:1.16 as test
-
-ENV GO111MODULE=on
-
-ADD . /build
-
-WORKDIR /build/internal
-
-RUN go test -v -race .
-
-
-
-FROM golang:1.16-alpine as build
+FROM golang:1.16 as test_build
 
 ENV GO111MODULE=on
 ENV CGO_ENABLED=0
 
 ADD . /build
 
-WORKDIR /build/cmd
+RUN go mod download -x
+RUN go test -v -race ./internal
 
-RUN go mod download
+WORKDIR /build/cmd
 RUN go build -o music-news .
 
 
 FROM golang:1.16-alpine
 
 WORKDIR /srv
-
-COPY --from=build /build/cmd/music-news /srv/music-news
-
+COPY --from=test_build /build/cmd/music-news /srv/music-news
 CMD ["/srv/music-news"]
