@@ -5,9 +5,7 @@ ENV CGO_ENABLED=0
 
 ADD . /build
 WORKDIR /build/internal
-RUN go mod download -x
-RUN go test -v -race .
-
+RUN go mod download
 WORKDIR /build/cmd
 RUN go build -o music-news .
 
