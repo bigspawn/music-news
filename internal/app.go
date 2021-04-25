@@ -102,13 +102,13 @@ func createScrapes(
 		return err
 	}
 
-	//music4newgenRssFeedParser := NewRssFeedParser(Music4newgenRSSFeedURL, store, lgr, NewMusic4newgen(lgr, client))
-	//music4newgenScr := NewMusicScraper(music4newgenRssFeedParser, lgr, ch, store)
-	//music4newgenJob := NewJob(music4newgenScr, scheduler, "music4newgen", lgr)
-	//_, err = scheduler.Every(31).Minutes().Do(music4newgenJob.Do, ctx)
-	//if err != nil {
-	//	return err
-	//}
+	music4newgenRssFeedParser := NewRssFeedParser(Music4newgenRSSFeedURL, store, lgr, NewMusic4newgen(lgr, client))
+	music4newgenScr := NewMusicScraper(music4newgenRssFeedParser, lgr, ch, store)
+	music4newgenJob := NewJob(music4newgenScr, scheduler, "music4newgen", lgr)
+	_, err = scheduler.Every(31).Minutes().Do(music4newgenJob.Do, ctx)
+	if err != nil {
+		return err
+	}
 
 	getrockmusicRssFeedParser := NewRssFeedParser(GetRockMusicRss, store, lgr, NewGetRockMusicParser(lgr, client))
 	getrockmusicScr := NewMusicScraper(getrockmusicRssFeedParser, lgr, ch, store)
