@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 )
 
 func Test_m4ngParser_Parse(t *testing.T) {
@@ -16,7 +17,7 @@ func Test_m4ngParser_Parse(t *testing.T) {
 	feed, err := gofeed.NewParser().Parse(strings.NewReader(m4ngRss))
 	require.NoError(t, err)
 
-	p := NewMusic4newgen(lgr.New(), http.DefaultClient)
+	p := NewMusic4newgen(lgr.New(), http.DefaultClient, time.Millisecond)
 	ctx := context.Background()
 	for _, i := range feed.Items {
 		result, err := p.Parse(ctx, i)

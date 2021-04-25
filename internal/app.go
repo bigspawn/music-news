@@ -94,7 +94,9 @@ func createScrapes(
 	go publisher.Start(ctx)
 
 	var err error
-	alterportalRssFeedParser := NewRssFeedParser(AlterportalRSSFeedURL, store, lgr, NewAlterportalParser(lgr, client))
+	var itemParser ItemParser
+	itemParser = NewAlterportalParser(lgr, client)
+	alterportalRssFeedParser := NewRssFeedParser(AlterportalRSSFeedURL, store, lgr, itemParser)
 	alterportalScr := NewMusicScraper(alterportalRssFeedParser, lgr, ch, store)
 	alterportalJob := NewJob(alterportalScr, scheduler, "alterportal", lgr)
 	_, err = scheduler.Every(30).Minutes().Do(alterportalJob.Do, ctx)
@@ -102,7 +104,8 @@ func createScrapes(
 		return err
 	}
 
-	music4newgenRssFeedParser := NewRssFeedParser(Music4newgenRSSFeedURL, store, lgr, NewMusic4newgen(lgr, client))
+	itemParser = NewMusic4newgen(lgr, client, 500*time.Millisecond)
+	music4newgenRssFeedParser := NewRssFeedParser(Music4newgenRSSFeedURL, store, lgr, itemParser)
 	music4newgenScr := NewMusicScraper(music4newgenRssFeedParser, lgr, ch, store)
 	music4newgenJob := NewJob(music4newgenScr, scheduler, "music4newgen", lgr)
 	_, err = scheduler.Every(31).Minutes().Do(music4newgenJob.Do, ctx)
@@ -110,7 +113,8 @@ func createScrapes(
 		return err
 	}
 
-	getrockmusicRssFeedParser := NewRssFeedParser(GetRockMusicRss, store, lgr, NewGetRockMusicParser(lgr, client))
+	itemParser = NewGetRockMusicParser(lgr, client)
+	getrockmusicRssFeedParser := NewRssFeedParser(GetRockMusicRss, store, lgr, itemParser)
 	getrockmusicScr := NewMusicScraper(getrockmusicRssFeedParser, lgr, ch, store)
 	getrockmusicJob := NewJob(getrockmusicScr, scheduler, "getrockmusic", lgr)
 	_, err = scheduler.Every(32).Minutes().Do(getrockmusicJob.Do, ctx)

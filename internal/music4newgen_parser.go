@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/go-pkgz/lgr"
@@ -17,19 +18,24 @@ const Music4newgenRSSFeedURL = "https://music4newgen.org/rss.xml"
 
 var ErrAccountIsDisabled = errors.New("Account is disabled")
 
-func NewMusic4newgen(lgr lgr.L, client *http.Client) ItemParser {
+func NewMusic4newgen(lgr lgr.L, client *http.Client, timeout time.Duration) ItemParser {
 	return &m4ngParser{
-		lgr:    lgr,
-		client: client,
+		lgr:     lgr,
+		client:  client,
+		timeout: timeout,
 	}
 }
 
 type m4ngParser struct {
-	lgr    lgr.L
-	client *http.Client
+	lgr     lgr.L
+	client  *http.Client
+	timeout time.Duration
 }
 
 func (p m4ngParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error) {
+	// to avoid being blocked
+	time.Sleep(p.timeout)
+
 	news := &News{
 		Title:    strings.TrimSpace(item.Title),
 		PageLink: item.Link,
