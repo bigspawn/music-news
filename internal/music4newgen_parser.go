@@ -67,6 +67,7 @@ func (p m4ngParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error)
 	if err != nil {
 		return nil, err
 	}
+	doc.Html()
 
 	//title := doc.Find("head > title:nth-child(2)").Text()
 	//
