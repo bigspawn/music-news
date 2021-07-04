@@ -3,13 +3,14 @@ package internal
 import (
 	"context"
 	"fmt"
-	"github.com/go-pkgz/lgr"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"golang.org/x/net/proxy"
 	"net"
 	"net/http"
 	"net/url"
 	"sort"
+
+	"github.com/go-pkgz/lgr"
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"golang.org/x/net/proxy"
 )
 
 type TelegramBot struct {
@@ -48,7 +49,6 @@ func NewTelegramBotAPI(p *Options, lgr lgr.L) (*TelegramBot, error) {
 		ChatId: p.ChatID,
 		lgr:    lgr,
 	}, nil
-
 }
 
 func (b *TelegramBot) SendNews(_ context.Context, item News) error {

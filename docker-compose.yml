@@ -10,7 +10,7 @@ services:
         max-size: "10m"
         max-file: "5"
     ports:
-      - 15432:5432
+      - "15432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

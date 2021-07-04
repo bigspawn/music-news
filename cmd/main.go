@@ -2,36 +2,37 @@ package main
 
 import (
 	"context"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/bigspawn/music-news/internal"
 	"github.com/go-pkgz/lgr"
 	"github.com/jessevdk/go-flags"
 	_ "github.com/lib/pq"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
-var Lgr = lgr.New(lgr.Msec, lgr.Debug, lgr.CallerFile, lgr.CallerFunc)
-
 func main() {
+	logger := lgr.New(lgr.Msec, lgr.Debug, lgr.CallerFile, lgr.CallerFunc)
+
 	opt := &internal.Options{}
 	p := flags.NewParser(opt, flags.Default)
 	if _, err := p.Parse(); err != nil {
-		Lgr.Logf("[FATAL] parse flags %v", err)
+		logger.Logf("[FATAL] parse flags err=%v", err)
 	}
 
-	go metrics()
+	go metrics(logger)
 
-	Lgr.Logf("[INFO] %v", opt)
+	logger.Logf("[INFO] %v", opt)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	app, err := internal.NewApp(ctx, opt, Lgr)
+	app, err := internal.NewApp(ctx, opt, logger)
 	if err != nil {
-		Lgr.Logf("[FATAL] init application: %w", err)
+		logger.Logf("[FATAL] init application: err=%v", err)
 	}
 
 	app.Start()
@@ -39,15 +40,15 @@ func main() {
 	ch := make(chan os.Signal)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 
-	Lgr.Logf("[INFO] system signal %s", <-ch)
+	logger.Logf("[INFO] system signal %s", <-ch)
 
 	cancel()
 	app.Stop()
 }
 
-func metrics() {
+func metrics(logger *lgr.Logger) {
 	http.Handle("/metrics", promhttp.Handler())
 	if err := http.ListenAndServe(":9091", nil); err != nil {
-		Lgr.Logf("[ERROR] metrics handler: err=%v", err)
+		logger.Logf("[ERROR] metrics handler: err=%v", err)
 	}
 }

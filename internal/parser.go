@@ -3,24 +3,12 @@ package internal
 import (
 	"context"
 	"errors"
-	"fmt"
 	"github.com/go-pkgz/lgr"
+	"github.com/mmcdole/gofeed"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"net/url"
-	"strings"
-	"unicode/utf8"
-
-	"github.com/PuerkitoBio/goquery"
-	"github.com/mmcdole/gofeed"
 )
-
-var (
-	ExcludeWords     = []string{"Leaked\n"}
-	ExcludeLastWords = []string{"Download\n", "Downloads\n", "Total length:", "Download", "Support! Facebook / iTunes"}
-)
-
-var ErrSkipItem = errors.New("skip item")
 
 const siteLabel = "site"
 
@@ -30,6 +18,15 @@ var errorCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name:      "parsed_error_total",
 	Help:      "Total count of parsed item errors",
 }, []string{siteLabel})
+
+var (
+	ErrAccountIsDisabled = errors.New("account is disabled")
+	ErrSkipItem          = errors.New("skip item")
+)
+
+type ItemParser interface {
+	Parse(ctx context.Context, item *gofeed.Item) (*News, error)
+}
 
 type RssFeedParser interface {
 	Parse(ctx context.Context) ([]News, error)
@@ -98,96 +95,9 @@ func (p parser) Parse(ctx context.Context) ([]News, error) {
 			p.lgr.Logf("[ERROR] failed parsing: item=%v, err=%v", item, err)
 			continue
 		}
+
 		news = append(news, *n)
 	}
+
 	return news, err
-}
-
-type ItemParser interface {
-	Parse(ctx context.Context, item *gofeed.Item) (*News, error)
-}
-
-func extractImage(document *goquery.Document) (string, error) {
-	imageLink := document.
-		Find("div[data-role=commentContent]").
-		Find("img[class~=ipsImage]").
-		Not("img[src~='https://kingdom-leaks.com/img/lastfm-logo.png']").
-		First()
-
-	if link, ok := imageLink.Attr("src"); ok && link != "" {
-		return link, nil
-	}
-	if link, ok := imageLink.Attr("data-imageproxy-source"); ok && link != "" {
-		return link, nil
-	}
-	if link, ok := imageLink.Attr("data-src"); ok && link != "" {
-		return link, nil
-	}
-
-	return "", errors.New("image link not found")
-}
-
-func normalize(description string) string {
-	for _, word := range ExcludeLastWords {
-		index := strings.LastIndex(description, word)
-		if index > 0 {
-			description = description[:index]
-		}
-	}
-	for _, word := range ExcludeWords {
-		index := strings.Index(description, word)
-		if index > -1 {
-			description = description[:index] + description[index+utf8.RuneCountInString(word):]
-		}
-	}
-	description = split(description)
-	return description
-}
-
-const (
-	genderTxt            = " Genre - "
-	genderNextLineTxt    = "\nGenre - "
-	qualityTxt           = " Quality - "
-	qualityNextLineTxt   = "\nQuality - "
-	trackListTxt         = " Tracklist: "
-	trackListNextLineTxt = "\nTracklist:\n"
-)
-
-func split(desc string) string {
-	isPrefixNeeds := strings.Contains(desc, "01. ")
-
-	max := 100
-	n := 1
-	for {
-		if n == max {
-			break
-		}
-
-		prefix := ""
-		if n < 10 && isPrefixNeeds {
-			prefix = "0"
-		}
-
-		oldV := fmt.Sprintf(" %s%d. ", prefix, n)
-		newV := fmt.Sprintf("\n%s%d. ", prefix, n)
-		desc = strings.Replace(desc, oldV, newV, 1)
-
-		n++
-	}
-
-	desc = strings.Replace(desc, genderTxt, genderNextLineTxt, 1)
-	desc = strings.Replace(desc, qualityTxt, qualityNextLineTxt, 1)
-	desc = strings.Replace(desc, trackListTxt, trackListNextLineTxt, 1)
-	desc = strings.ReplaceAll(desc, "&nbsp;", "\n")
-
-	return desc
-}
-
-func containText(text string, words []string) bool {
-	for _, word := range words {
-		if strings.Contains(strings.ToLower(text), strings.ToLower(word)) {
-			return true
-		}
-	}
-	return false
 }

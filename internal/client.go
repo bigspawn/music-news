@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/go-pkgz/lgr"
 	"net/http"
 	url "net/url"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/go-pkgz/lgr"
 )
 
 const (

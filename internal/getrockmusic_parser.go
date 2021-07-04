@@ -3,12 +3,13 @@ package internal
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/go-pkgz/lgr"
 	"github.com/mmcdole/gofeed"
 	"github.com/pkg/errors"
-	"net/http"
-	"strings"
 )
 
 const GetRockMusicRss = "https://getrockmusic.net/rss.xml"

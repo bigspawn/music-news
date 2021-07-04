@@ -3,9 +3,10 @@ package internal
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/go-pkgz/lgr"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"time"
 )
 
 const notifiesTimeout = time.Second

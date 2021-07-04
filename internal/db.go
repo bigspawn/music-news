@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/go-pkgz/lgr"
 	"strings"
 	"time"
+
+	"github.com/go-pkgz/lgr"
 )
 
 const (
@@ -42,7 +43,7 @@ const (
 							WHERE title LIKE '%' || $1 || '%'`
 )
 
-// News is an article structure
+// News is an article structure.
 type News struct {
 	ID           int
 	Title        string
