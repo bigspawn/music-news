@@ -20,7 +20,7 @@ func main() {
 	opt := &internal.Options{}
 	p := flags.NewParser(opt, flags.Default)
 	if _, err := p.Parse(); err != nil {
-		logger.Logf("[FATAL] parse flags %v", err)
+		logger.Logf("[FATAL] parse flags err=%v", err)
 	}
 
 	go metrics(logger)
@@ -32,7 +32,7 @@ func main() {
 
 	app, err := internal.NewApp(ctx, opt, logger)
 	if err != nil {
-		logger.Logf("[FATAL] init application: %w", err)
+		logger.Logf("[FATAL] init application: err=%v", err)
 	}
 
 	app.Start()
