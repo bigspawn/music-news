@@ -30,7 +30,6 @@ services:
     environment:
       BOT_ID: ""
       CHAT_ID: ""
-      FEED_URL: https://alterportal.net/rss.xml
       DB_URL: ""
     ports:
       - "19091:9091"
