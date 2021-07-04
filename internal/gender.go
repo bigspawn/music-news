@@ -3,27 +3,52 @@ package internal
 import "strings"
 
 var skipGenders = []string{
-	"Retro Pop", "R&B", "Pop Music", "Pop Rock", "City Pop", "Disco", "Eurodance", "Hip-Hop",
-	"retro pop", "r&b", "pop music", "pop rock", "city pop", "disco", "eurodance", "hip-hop",
-	"Pop", "pop", "Rap / Hip Hop", "R'n'B", "Dance / Electronic / House",
-	"Rockabilly", "rockabilly",
-	"Punkabilly", "punkabilly",
-	"Psychobilly", "psychobilly",
-	"Street Punk", "street punk",
-	"Blues Rock", "blues rock",
-	"Country / Cow Punk / Hillbilly", "Cow Punk",
-	"Hillbilly", "hillbilly",
-	"Gothabilly", "gothabilly",
-	"Death 'n' Roll",
+	"Blues Rock",
+	"Celtic Punk",
+	"City Pop",
 	"Country",
-	"Oi! / Punk Rock",
+	"Cow Punk",
+	"Dance",
+	"Death 'n' Roll",
 	"Deutschpunk",
+	"Disco",
+	"Eurodance",
+	"Gothabilly",
+	"Hillbilly",
+	"Hip-Hop",
+	"House",
+	"Oi!",
+	"Pop Music",
+	"Pop Rock",
+	"Pop",
+	"Psychobilly",
+	"Punkabilly",
+	"R&B",
+	"R'n'B",
+	"Rap / Hip Hop",
+	"Retro Pop",
+	"Rockabilly",
 	"Skate Punk",
+	"Street Punk",
 }
 
 func isSkippedGender(data string) bool {
-	for _, s := range skipGenders {
-		if strings.Contains(data, s) || strings.Contains(data, s) {
+	if len(data) == 0 {
+		return false
+	}
+
+	for i := range skipGenders {
+		if containsAny(data, skipGenders[i], strings.ToLower(skipGenders[i])) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func containsAny(s string, substr ...string) bool {
+	for _, ss := range substr {
+		if strings.Contains(s, ss) {
 			return true
 		}
 	}
