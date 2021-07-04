@@ -2,12 +2,13 @@ package internal
 
 import (
 	"context"
-	"github.com/go-pkgz/lgr"
-	"github.com/mmcdole/gofeed"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/go-pkgz/lgr"
+	"github.com/mmcdole/gofeed"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_getRockMusicParser_Parse(t *testing.T) {

@@ -3,14 +3,15 @@ package internal
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"regexp"
+	"strings"
+
 	"github.com/PuerkitoBio/goquery"
 	"github.com/go-pkgz/lgr"
 	"github.com/mmcdole/gofeed"
 	"github.com/pkg/errors"
 	"golang.org/x/net/html"
-	"net/http"
-	"regexp"
-	"strings"
 )
 
 const AlterportalRSSFeedURL = "https://alterportal.net/rss.xml"
@@ -224,47 +225,4 @@ var skipWords = map[string]struct{}{
 	"official website": {}, "facebook": {}, "download": {}, "zippyshare": {}, "yadisk": {}, "i": {}, "скачать!": {},
 	"вк!": {}, "instagram": {}, "twitter": {}, "spotify": {}, "|": {}, ":": {}, "прослушка!": {}, "cкачать": {},
 	"официальный сайт": {}, "apple music": {}, "mediafire": {}, "прослушка": {},
-}
-
-func isSkippedGender(data string) bool {
-	for _, s := range skipGenders {
-		if strings.Contains(data, s) || strings.Contains(data, s) {
-			return true
-		}
-	}
-	return false
-}
-
-var skipGenders = []string{
-	"Retro Pop", "R&B", "Pop Music", "Pop Rock", "City Pop", "Disco", "Eurodance", "Hip-Hop",
-	"retro pop", "r&b", "pop music", "pop rock", "city pop", "disco", "eurodance", "hip-hop",
-	"Pop", "pop", "Rap / Hip Hop", "R'n'B", "Dance / Electronic / House",
-	"Rockabilly", "rockabilly",
-	"Punkabilly", "punkabilly",
-	"Psychobilly", "psychobilly",
-}
-
-func isAllowedFileHost(host string) bool {
-	for _, s := range fileHosts {
-		if strings.Contains(host, s) {
-			return true
-		}
-	}
-	return false
-}
-
-var fileHosts = []string{
-	"mediafire.com",
-	"zippyshare.com",
-	"mega.nz",
-	"solidfiles.com",
-	"drive.google.com",
-	"files.mail.ru",
-	"disk.yandex.ru",
-	"yadi.sk",
-	"files.fm",
-	"uppit.com",
-	"filecrypt.cc",
-	"turb.cc",
-	"turbobit.net",
 }

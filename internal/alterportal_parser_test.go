@@ -2,12 +2,13 @@ package internal
 
 import (
 	"context"
-	"github.com/go-pkgz/lgr"
-	"github.com/mmcdole/gofeed"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"strings"
 	"testing"
+
+	"github.com/go-pkgz/lgr"
+	"github.com/mmcdole/gofeed"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetMetalParser_Parse(t *testing.T) {
@@ -16,8 +17,8 @@ func TestGetMetalParser_Parse(t *testing.T) {
 	feed, err := gofeed.NewParser().Parse(strings.NewReader(alterportalRss))
 	require.NoError(t, err)
 
-	//feed, err := gofeed.NewParser().ParseURL(rssFeed)
-	//require.NoError(t, err)
+	// feed, err := gofeed.NewParser().ParseURL(rssFeed)
+	// require.NoError(t, err)
 
 	p := NewAlterportalParser(lgr.New(), http.DefaultClient)
 	ctx := context.Background()

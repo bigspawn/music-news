@@ -2,8 +2,9 @@ package internal
 
 import (
 	"context"
-	"github.com/go-pkgz/lgr"
 	"time"
+
+	"github.com/go-pkgz/lgr"
 )
 
 const (
@@ -58,20 +59,4 @@ func (s scraper) Scrape(ctx context.Context) error {
 	}()
 
 	return nil
-}
-
-func Merge(current []*News, unpublished map[string]*News) {
-	if len(unpublished) == 0 {
-		return
-	}
-
-	for _, c := range current {
-		if _, ok := unpublished[c.Title]; ok {
-			delete(unpublished, c.Title)
-		}
-	}
-
-	for _, v := range unpublished {
-		current = append(current, v)
-	}
 }

@@ -21,6 +21,13 @@ type Options struct {
 	SongAPIKey string `long:"song_api_key" env:"SONG_API_KEY"`
 }
 
+type App struct {
+	store     *Store
+	lgr       lgr.L
+	scheduler *gocron.Scheduler
+	ch        chan []News
+}
+
 func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 	bot, err := NewTelegramBotAPI(opt, lgr)
 	if err != nil {
@@ -33,7 +40,6 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 	}
 
 	ch := make(chan []News)
-
 	scheduler := gocron.NewScheduler(time.Now().Location())
 
 	app := &App{
@@ -44,24 +50,18 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 	}
 
 	if opt.Notify {
-		err := createNotifier(ctx, opt, lgr, store, bot, scheduler)
-		if err != nil {
-			return nil, err
-		}
-		return app, nil
-	}
+		err = runNotifier(ctx, opt, lgr, store, bot, scheduler)
+	} else {
 
-	if err := createScrapes(ctx, lgr, store, bot, scheduler, ch); err != nil {
+		go NewPublisher(lgr, store, bot, ch).Start(ctx)
+
+		err = runScrapers(ctx, lgr, store, scheduler, ch)
+	}
+	if err != nil {
 		return nil, err
 	}
-	return app, nil
-}
 
-type App struct {
-	store     *Store
-	lgr       lgr.L
-	scheduler *gocron.Scheduler
-	ch        chan []News
+	return app, nil
 }
 
 func (a *App) Start() {
@@ -77,21 +77,38 @@ func (a *App) Stop() {
 	close(a.ch)
 }
 
-func createScrapes(
+func runNotifier(
 	ctx context.Context,
+	opt *Options,
 	lgr lgr.L,
 	store *Store,
 	bot *TelegramBot,
+	scheduler *gocron.Scheduler,
+) error {
+	linkApi := NewLinkApi(opt.SongAPIKey, lgr)
+	notifier := NewNotifier(store, bot, linkApi, lgr)
+
+	_, err := scheduler.Every(3).Hour().Do(func() {
+		if err := notifier.Notify(ctx); err != nil {
+			lgr.Logf("[ERROR] notifier %v", err)
+		}
+
+		_, next := scheduler.NextRun()
+		lgr.Logf("[INFO] job next start %s", next)
+	})
+	return err
+}
+
+func runScrapers(
+	ctx context.Context,
+	lgr lgr.L,
+	store *Store,
 	scheduler *gocron.Scheduler,
 	ch chan []News,
 ) error {
 	client := &http.Client{
 		Timeout: 30 * time.Second,
 	}
-
-	publisher := NewPublisher(lgr, store, bot, ch)
-
-	go publisher.Start(ctx)
 
 	var err error
 	var itemParser ItemParser
@@ -104,15 +121,6 @@ func createScrapes(
 		return err
 	}
 
-	//itemParser = NewMusic4newgen(lgr, client, 500*time.Millisecond)
-	//music4newgenRssFeedParser := NewRssFeedParser(Music4newgenRSSFeedURL, store, lgr, itemParser)
-	//music4newgenScr := NewMusicScraper(music4newgenRssFeedParser, lgr, ch, store)
-	//music4newgenJob := NewJob(music4newgenScr, scheduler, "music4newgen", lgr)
-	//_, err = scheduler.Every(31).Minutes().Do(music4newgenJob.Do, ctx)
-	//if err != nil {
-	//	return err
-	//}
-
 	itemParser = NewGetRockMusicParser(lgr, client)
 	getrockmusicRssFeedParser := NewRssFeedParser(GetRockMusicRss, store, lgr, itemParser)
 	getrockmusicScr := NewMusicScraper(getrockmusicRssFeedParser, lgr, ch, store)
@@ -123,47 +131,4 @@ func createScrapes(
 	}
 
 	return nil
-}
-
-func createNotifier(ctx context.Context, opt *Options, lgr lgr.L, store *Store, bot *TelegramBot,
-	scheduler *gocron.Scheduler) error {
-
-	linkApi := NewLinkApi(opt.SongAPIKey, lgr)
-	notifier := NewNotifier(store, bot, linkApi, lgr)
-
-	_, err := scheduler.Every(3).Hour().Do(func() {
-		if err := notifier.Notify(ctx); err != nil {
-			lgr.Logf("[ERROR] notifier %v", err)
-		}
-
-		_, next := scheduler.NextRun()
-		lgr.Logf("[INFO] job next start %s", next)
-	})
-
-	return err
-}
-
-func NewJob(s MusicScraper, sch *gocron.Scheduler, name string, lgr lgr.L) *Job {
-	return &Job{
-		s:    s,
-		sch:  sch,
-		name: name,
-		lgr:  lgr,
-	}
-}
-
-type Job struct {
-	s    MusicScraper
-	sch  *gocron.Scheduler
-	name string
-	lgr  lgr.L
-}
-
-func (j Job) Do(ctx context.Context) {
-	if err := j.s.Scrape(ctx); err != nil {
-		j.lgr.Logf("[ERROR] %s scraper %v", j.name, err)
-	}
-
-	_, next := j.sch.NextRun()
-	j.lgr.Logf("[INFO] %s job next start %s", j.name, next)
 }

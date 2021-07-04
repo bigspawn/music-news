@@ -2,8 +2,9 @@ package internal
 
 import (
 	"context"
-	"github.com/go-pkgz/lgr"
 	"testing"
+
+	"github.com/go-pkgz/lgr"
 )
 
 func Test_clearTitle(t *testing.T) {
@@ -52,7 +53,7 @@ func Test_clearTitle(t *testing.T) {
 		{title: "Biesy - Transsatanizm (2020)", want: "Biesy - Transsatanizm"},
 		{title: "Want - Tilt [Single] (2020)", want: "Want - Tilt"},
 		{title: "Dead Days - Black Summer [Single] (2020)", want: "Dead Days - Black Summer"},
-		{title: "Colour in the Clouds - In Melancholy [Single] (2020)", want: "Colour in the Clouds - In Melancholy"},
+		{title: "Color in the Clouds - In Melancholy [Single] (2020)", want: "Color in the Clouds - In Melancholy"},
 		{title: "Dream Awake - Prosper [EP] (2020)", want: "Dream Awake - Prosper"},
 		{title: "Beyond The Black - Wounded Healer [Single] (2020)", want: "Beyond The Black - Wounded Healer"},
 		{title: "Regimen De Terror - Inherente Del Poder [EP] (2020)", want: "Regimen De Terror - Inherente Del Poder"},
@@ -60,7 +61,7 @@ func Test_clearTitle(t *testing.T) {
 		{title: "Vatic - Departure [Single] (2020)", want: "Vatic - Departure"},
 		{title: "Glass Tides - Sew Your Mouth Shut [Single] (2020)", want: "Glass Tides - Sew Your Mouth Shut"},
 		{title: "The Motion Below - Truth Hurts [Single] (2020)", want: "The Motion Below - Truth Hurts"},
-		{title: "Of Colours (feat. Dennis Landt) - Bleak [Single] (2020)", want: "Of Colours (feat. Dennis Landt) - Bleak"},
+		{title: "Of Colors (feat. Dennis Landt) - Bleak [Single] (2020)", want: "Of Colors (feat. Dennis Landt) - Bleak"},
 		{title: "Relent - LOW [Single] (2020)", want: "Relent - LOW"},
 		{title: "Fractures and Outlines - Kerosene (feat. Jericho Spencer-Champagne) [Single] (2020)", want: "Fractures and Outlines - Kerosene (feat. Jericho Spencer-Champagne)"},
 		{title: "Chasing Apparitions - As Above, So Below [Single] (2020)", want: "Chasing Apparitions - As Above, So Below"},
