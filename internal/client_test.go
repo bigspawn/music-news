@@ -84,7 +84,7 @@ func Test_clearTitle(t *testing.T) {
 func TestLinksApi_GetLinks(t *testing.T) {
 	t.Skip()
 	api := NewLinkApi("", lgr.New())
-	link, links, err := api.GetLinks(context.Background(), "RAD PITT - Flivid")
+	link, links, err := api.GetLinks(context.Background(), "Half Moon Run - Inwards & Onwards (EP)")
 	if err != nil {
 		t.Error(err)
 	}

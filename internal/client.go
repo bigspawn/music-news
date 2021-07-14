@@ -24,7 +24,7 @@ var (
 	entity   = []string{"album"}
 	platform = []string{string(ItunesPlatform)}
 
-	unusedSuffixRegexp = regexp.MustCompile(`\(\d+\)|\[EP]|\[[singleSINGLE]+]|\([singleSINGLE]+\)|(\sEP\s+)`)
+	unusedSuffixRegexp = regexp.MustCompile(`\(\d+\)|([\[(][singleSINGLEpP]+[])])`)
 )
 
 type SearchResult struct {
@@ -147,8 +147,7 @@ func NewLinkApi(key string, lgr lgr.L) *LinksApi {
 }
 
 func (a *LinksApi) GetLink(ctx context.Context, title string) (string, error) {
-	title = clearTitle(title)
-	id, err := a.getIDiTunes(ctx, title)
+	id, err := a.getIDiTunes(ctx, clearTitle(title))
 	if err != nil {
 		return "", err
 	}
@@ -173,14 +172,35 @@ func (a *LinksApi) getIDiTunes(_ context.Context, title string) (string, error) 
 		return "", err
 	}
 
-	for _, item := range result.Results {
-		resultName := strings.ToLower(fmt.Sprintf("%s - %s", item.ArtistName, item.CollectionName))
-		if strings.Contains(resultName, strings.ToLower(title)) {
+	id, err := getID(result.Results, title)
+	if err != nil {
+		a.lgr.Logf("[INFO] iTunes response: %v", result)
+		return "", err
+	}
+	return id, nil
+}
+
+func getID(results []Item, title string) (string, error) {
+	lowerTitle := strings.ToLower(title)
+	count := 0
+	for _, item := range results {
+		var tokens []string
+		tokens = append(tokens,
+			append(
+				strings.Split(strings.ToLower(item.ArtistName), " "),
+				strings.Split(strings.ToLower(item.CollectionName), " ")...,
+			)...,
+		)
+		for _, token := range tokens {
+			if strings.Contains(lowerTitle, token) {
+				count++
+			}
+		}
+		percent := float64(count) / float64(len(tokens)) * float64(100)
+		if percent >= 65 {
 			return strconv.Itoa(item.CollectionId), nil
 		}
 	}
-
-	a.lgr.Logf("[INFO] iTunes response: %v", result)
 
 	return "", fmt.Errorf("albums in iTunes not found: title=%s", title)
 }
@@ -250,10 +270,12 @@ func (a *LinksApi) GetLinks(ctx context.Context, title string) (string, map[Plat
 	if err != nil {
 		return "", nil, err
 	}
+
 	resp, err := a.GetSongLink(ctx, id)
 	if err != nil {
 		return "", nil, err
 	}
+
 	links := make(map[Platform]string, len(resp.LinksByPlatform))
 	for p, l := range resp.LinksByPlatform {
 		if l.Url != "" {
