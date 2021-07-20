@@ -10,7 +10,7 @@ RUN \
   cd cmd && go build -o /build/music-news
 
 
-FROM golang:1.16-alpine
+FROM golang:1.16
 
 WORKDIR /srv
 
