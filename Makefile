@@ -1,3 +1,7 @@
+#!make
+include local/.env
+export $(shell sed 's/=.*//' local/.env)
+
 docker:
 	docker build -t bigspawn:music-news .
 
@@ -11,3 +15,9 @@ upgrade_prod:
 	git pull
 	docker-compose -f docker-compose-prod.yml rm -s -f news notifier
 	docker-compose -f docker-compose-prod.yml up --build -d news notifier
+
+run_parser:
+	go run cmd/main.go
+
+run_notifier:
+	NOTIFY=true go run cmd/main.go

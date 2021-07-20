@@ -44,6 +44,8 @@ func (n *Notifier) Notify(ctx context.Context) error {
 			continue
 		}
 
+		n.lgr.Logf("[INFO] platforms=%s", linksByPlatform)
+
 		links, err := validatePlatforms(linksByPlatform)
 		if err != nil {
 			n.lgr.Logf("[ERROR] validate platforms: title=%s, err=%v", item.Title, err)

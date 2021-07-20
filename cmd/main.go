@@ -10,7 +10,8 @@ import (
 	"github.com/bigspawn/music-news/internal"
 	"github.com/go-pkgz/lgr"
 	"github.com/jessevdk/go-flags"
-	_ "github.com/lib/pq"
+	//_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 

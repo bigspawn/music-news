@@ -11,35 +11,35 @@ import (
 )
 
 const (
-	driver      = "postgres"
-	insertQuery = `			INSERT INTO public.news(title, playlist, date_time, imageurl, downloadurl, pageurl, posted, created_at) 
+	driver      = "sqlite3"
+	insertQuery = `			INSERT INTO main.news(title, playlist, date_time, imageurl, downloadurl, pageurl, posted, created_at) 
 							VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
 
 	selectNotified = `		SELECT id, title, playlist, imageurl, date_time, downloadurl
-							FROM public.news
-							WHERE notified = false
+							FROM main.news
+							WHERE not notified
 							  AND title NOT LIKE '%Single%'
 							  AND title NOT LIKE '%single%'
-							  AND created_at > now() - interval '4 week'
+							  AND created_at > strftime('%Y-%m-%d %H:%M:%S+00:00', 'now', 'utc', '-1 months')
 							ORDER BY date_time`
 
-	updateNotified = `		UPDATE news 
+	updateNotified = `		UPDATE main.news 
 							SET notified = true 
 							WHERE id = $1`
 
 	selectUnpublished = `	SELECT id, title, playlist, imageurl, date_time, downloadurl, pageurl
-							FROM public.news
+							FROM main.news
 							WHERE posted = false
 							  AND created_at > now() - interval '4 week'
 							  AND created_at < now() - interval '1 minute'
 							ORDER BY created_at`
 
-	updatePosted = `		UPDATE news 
+	updatePosted = `		UPDATE main.news 
 							SET posted = true 
 							WHERE title = $1`
 
 	selectExists = `		SELECT * 
-							FROM public.news 
+							FROM main.news 
 							WHERE title LIKE '%' || $1 || '%'`
 )
 
