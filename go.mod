@@ -11,6 +11,7 @@ require (
 	github.com/jessevdk/go-flags v1.5.0
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/lib/pq v1.10.2
+	github.com/mattn/go-sqlite3 v1.14.8 // indirect
 	github.com/mmcdole/gofeed v1.1.3
 	github.com/mmcdole/goxpp v0.0.0-20200921145534-2f3784f67354 // indirect
 	github.com/pkg/errors v0.9.1

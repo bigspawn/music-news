@@ -1,7 +1,7 @@
-FROM golang:1.16-alpine as build
+FROM golang:1.16 as build
 
 ENV GO111MODULE=on
-ENV CGO_ENABLED=0
+ENV CGO_ENABLED=1
 
 ADD . /build
 WORKDIR /build
@@ -10,7 +10,7 @@ RUN \
   cd cmd && go build -o /build/music-news
 
 
-FROM golang:1.16-alpine
+FROM golang:1.16
 
 WORKDIR /srv
 
