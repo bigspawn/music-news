@@ -1,7 +1,7 @@
 FROM golang:1.16-alpine as build
 
 ENV GO111MODULE=on
-ENV CGO_ENABLED=0
+ENV CGO_ENABLED=1
 
 ADD . /build
 WORKDIR /build
