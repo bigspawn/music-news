@@ -2,6 +2,8 @@
 include local/.env
 export $(shell sed 's/=.*//' local/.env)
 
+# TODO: fix env (dont work on server)
+
 docker:
 	docker build -t bigspawn:music-news .
 
