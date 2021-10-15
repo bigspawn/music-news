@@ -12,7 +12,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-const GetRockMusicRss = "https://getrockmusic.net/rss.xml"
+const (
+	GetRockMusicHost = "https://getrockmusic.net"
+	GetRockMusicRss  = GetRockMusicHost + "/rss.xml"
+)
 
 type GetRockMusicParser struct {
 	Lgr    lgr.L
@@ -54,6 +57,10 @@ func (p *GetRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*New
 	news.ImageLink, exists = doc.Find(".fscover").Find("img[src]").Attr("src")
 	if !exists {
 		return nil, errors.New("image src not exists")
+	}
+
+	if strings.HasPrefix(news.ImageLink, "/uploads/") {
+		news.ImageLink = GetRockMusicHost + news.ImageLink
 	}
 
 	content := doc.Find("div.generalblock:nth-child(3)")

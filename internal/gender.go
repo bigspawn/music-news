@@ -42,7 +42,7 @@ func isSkippedGender(l lgr.L, data string) bool {
 
 	for i := range skipGenders {
 		if ok, reason := containsAny(data, skipGenders[i], strings.ToLower(skipGenders[i])); ok {
-			l.Logf("%s is skipped by %s", data, reason)
+			l.Logf("%s\n -------------- Is skipped by '%s' -------------- ", data, reason)
 			return ok
 		}
 	}
