@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"net/http"
 	"strings"
 	"testing"
 
