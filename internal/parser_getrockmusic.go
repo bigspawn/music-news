@@ -39,7 +39,7 @@ func (p *GetRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*New
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	if res.StatusCode != 200 {
 		return nil, fmt.Errorf("response not 200: code=%d; status=%s", res.StatusCode, res.Status)
@@ -86,7 +86,7 @@ func (p *GetRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*New
 	}
 	news.Text = strings.TrimSpace(builder.String())
 
-	if isSkippedGender(news.Text) {
+	if isSkippedGender(p.Lgr, news.Text) {
 		return nil, ErrSkipItem
 	}
 

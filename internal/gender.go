@@ -1,12 +1,15 @@
 package internal
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/go-pkgz/lgr"
+)
 
 var skipGenders = []string{
 	"Blues Rock",
 	"Celtic Punk",
 	"City Pop",
-	"Country",
 	"Cow Punk",
 	"Dance",
 	"Death 'n' Roll",
@@ -32,25 +35,27 @@ var skipGenders = []string{
 	"Street Punk",
 }
 
-func isSkippedGender(data string) bool {
+func isSkippedGender(l lgr.L, data string) bool {
 	if len(data) == 0 {
 		return false
 	}
 
 	for i := range skipGenders {
-		if containsAny(data, skipGenders[i], strings.ToLower(skipGenders[i])) {
-			return true
+		if ok, reason := containsAny(data, skipGenders[i], strings.ToLower(skipGenders[i])); ok {
+			l.Logf("%s is skipped by %s", data, reason)
+			return ok
 		}
 	}
 
 	return false
 }
 
-func containsAny(s string, substr ...string) bool {
+func containsAny(s string, substr ...string) (bool, string) {
 	for _, ss := range substr {
 		if strings.Contains(s, ss) {
-			return true
+			return true, ss
 		}
 	}
-	return false
+
+	return false, ""
 }

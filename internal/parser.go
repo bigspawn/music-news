@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"math/rand"
-	"net/url"
 	"time"
 
 	"github.com/go-pkgz/lgr"
@@ -31,28 +30,6 @@ type ItemParser interface {
 	Parse(ctx context.Context, item *gofeed.Item) (*News, error)
 }
 
-type RssFeedParser interface {
-	Parse(ctx context.Context) ([]News, error)
-}
-
-func NewRssFeedParser(rssHost string, store *Store, lgr lgr.L, itemParser ItemParser,
-	feedParser *gofeed.Parser) RssFeedParser {
-
-	link, err := url.Parse(rssHost)
-	if err != nil {
-		lgr.Logf("[FATAL] %w+", err)
-	}
-
-	return &Parser{
-		url:        rssHost,
-		feedParser: feedParser,
-		store:      store,
-		lgr:        lgr,
-		itemParser: itemParser,
-		siteLabel:  link.Host,
-	}
-}
-
 type Parser struct {
 	url        string
 	feedParser *gofeed.Parser
@@ -68,9 +45,6 @@ func (p *Parser) Parse(ctx context.Context) ([]News, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	min := 1
-	max := 15
 
 	news := make([]News, 0, len(feed.Items))
 	for _, item := range feed.Items {
@@ -108,9 +82,9 @@ func (p *Parser) Parse(ctx context.Context) ([]News, error) {
 		news = append(news, *n)
 
 		if p.withDelay {
-			duration := time.Duration(RandBetween(max, min)) * time.Second
+			duration := time.Duration(RandBetween(15, 1)) * time.Second
 
-			p.lgr.Logf("[INFO] sleep: sec=%s", duration)
+			p.lgr.Logf("[INFO] %s: sleep: sec=%s", p.siteLabel, duration)
 
 			t := time.NewTimer(duration)
 			select {

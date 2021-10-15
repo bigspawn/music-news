@@ -17,24 +17,26 @@ type MusicScraper interface {
 }
 
 type Scraper struct {
-	parser    RssFeedParser
+	parser    *Parser
 	lgr       lgr.L
 	ch        chan<- []News
 	store     *Store
 	withDelay bool
+	name      string
 }
 
 func (s Scraper) Scrape(ctx context.Context) error {
 	if s.withDelay {
 		sec := RandBetween(10*60, 1)
 		duration := time.Duration(sec) * time.Second
-		s.lgr.Logf("[INFO] sleep %s", duration)
+		s.lgr.Logf("[INFO] %s: sleep %s", s.name, duration)
 
 		t := time.NewTimer(duration)
 		defer t.Stop()
 
 		select {
 		case <-t.C:
+			// go
 		case <-ctx.Done():
 			return nil
 		}

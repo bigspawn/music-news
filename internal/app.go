@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"database/sql"
 	"net"
 	"net/http"
 	"net/url"
@@ -9,8 +10,8 @@ import (
 
 	"github.com/go-co-op/gocron"
 	"github.com/go-pkgz/lgr"
+	tbapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/mmcdole/gofeed"
-	"github.com/pkg/errors"
 	"golang.org/x/net/proxy"
 )
 
@@ -34,19 +35,31 @@ type App struct {
 }
 
 func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
-	bot, err := NewTelegramBotAPI(opt, lgr)
+	db, err := sql.Open(driver, opt.DbURL)
 	if err != nil {
-		return nil, errors.Wrap(err, "init telegram BotAPI api")
+		return nil, err
 	}
 
-	store, err := NewNewsStore(opt.DbURL, lgr)
+	dialer, err := newDialer(opt)
 	if err != nil {
-		return nil, errors.Wrap(err, "init Store")
+		return nil, err
+	}
+
+	bot, err := tbapi.NewBotAPIWithClient(opt.BotID, newClient(dialer))
+	if err != nil {
+		return nil, err
 	}
 
 	app := &App{
-		store:     store,
-		bot:       bot,
+		store: &Store{
+			db:  db,
+			lgr: lgr,
+		},
+		bot: &TelegramBot{
+			BotAPI: bot,
+			ChatId: opt.ChatID,
+			Lgr:    lgr,
+		},
 		lgr:       lgr,
 		scheduler: gocron.NewScheduler(time.Now().Location()),
 		ch:        make(chan []News),
@@ -63,8 +76,8 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 	publisher := &Publisher{
 		Lgr:    lgr,
 		NewsCh: app.ch,
-		BotAPI: bot,
-		Store:  store,
+		BotAPI: app.bot,
+		Store:  app.store,
 	}
 
 	go publisher.Start(ctx)
@@ -138,6 +151,7 @@ func (a *App) runScrapers(ctx context.Context, opt *Options) error {
 			ch:        a.ch,
 			store:     a.store,
 			withDelay: false,
+			name:      "alterPortal",
 		},
 		sch:  a.scheduler,
 		name: "alterPortal",
@@ -183,6 +197,7 @@ func (a *App) runScrapers(ctx context.Context, opt *Options) error {
 			ch:        a.ch,
 			store:     a.store,
 			withDelay: true,
+			name:      "getRockMusic",
 		},
 		sch:  a.scheduler,
 		name: "getRockMusic",

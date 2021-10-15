@@ -26,6 +26,7 @@ type AlterPortalParser struct {
 func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error) {
 	if strings.Contains(item.Link, "raznoe") ||
 		strings.Contains(item.Link, "video") ||
+		strings.Contains(item.Link, "news") ||
 		strings.Contains(item.Link, "neformat") {
 		return nil, ErrSkipItem
 	}
@@ -123,7 +124,7 @@ func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 	}
 	news.Text = builder.String()
 
-	if isSkippedGender(news.Text) {
+	if isSkippedGender(p.Lgr, news.Text) {
 		return nil, ErrSkipItem
 	}
 

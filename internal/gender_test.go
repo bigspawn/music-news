@@ -1,6 +1,10 @@
 package internal
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/go-pkgz/lgr"
+)
 
 func Test_isSkippedGender(t *testing.T) {
 	type args struct {
@@ -35,7 +39,7 @@ func Test_isSkippedGender(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isSkippedGender(tt.args.data); got != tt.want {
+			if got := isSkippedGender(lgr.Default(), tt.args.data); got != tt.want {
 				t.Errorf("isSkippedGender() = %v, want %v", got, tt.want)
 			}
 		})

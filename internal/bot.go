@@ -16,7 +16,7 @@ import (
 type TelegramBot struct {
 	BotAPI *tbapi.BotAPI
 	ChatId int64
-	lgr    lgr.L
+	Lgr    lgr.L
 }
 
 func NewTelegramBotAPI(p *Options, lgr lgr.L) (*TelegramBot, error) {
@@ -46,12 +46,12 @@ func NewTelegramBotAPI(p *Options, lgr lgr.L) (*TelegramBot, error) {
 	return &TelegramBot{
 		BotAPI: bot,
 		ChatId: p.ChatID,
-		lgr:    lgr,
+		Lgr:    lgr,
 	}, nil
 }
 
 func (b *TelegramBot) SendNews(_ context.Context, item News) error {
-	b.lgr.Logf("[INFO] send news %v", item)
+	b.Lgr.Logf("[INFO] send news %v", item)
 
 	pUrl, err := encodeQuery(item.PageLink)
 	if err != nil {
@@ -76,7 +76,7 @@ func (b *TelegramBot) SendNews(_ context.Context, item News) error {
 }
 
 func (b *TelegramBot) SendImage(_ context.Context, n News) (int, error) {
-	b.lgr.Logf("[INFO] send image %v", n)
+	b.Lgr.Logf("[INFO] send image %v", n)
 
 	msg, err := b.BotAPI.Send(tbapi.NewPhotoShare(b.ChatId, n.ImageLink))
 	if err != nil {
@@ -86,7 +86,7 @@ func (b *TelegramBot) SendImage(_ context.Context, n News) (int, error) {
 }
 
 func (b *TelegramBot) SendRelease(item News, releaseLink string) error {
-	b.lgr.Logf("[INFO] send release link %s, %v", releaseLink, item)
+	b.Lgr.Logf("[INFO] send release link %s, %v", releaseLink, item)
 
 	id, err := b.SendImage(nil, item)
 	if err != nil {
@@ -102,7 +102,7 @@ func (b *TelegramBot) SendRelease(item News, releaseLink string) error {
 }
 
 func (b *TelegramBot) SendReleaseWithButtons(item News, releaseLink string, links map[Platform]string) error {
-	b.lgr.Logf("[INFO] send release with Links %v, %v", links, item)
+	b.Lgr.Logf("[INFO] send release with Links %v, %v", links, item)
 
 	id, err := b.SendImage(nil, item)
 	if err != nil {

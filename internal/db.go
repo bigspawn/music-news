@@ -59,24 +59,12 @@ type Store struct {
 	lgr lgr.L
 }
 
-func NewNewsStore(conn string, lgr lgr.L) (*Store, error) {
-	db, err := sql.Open(driver, conn)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Store{
-		db:  db,
-		lgr: lgr,
-	}, nil
-}
-
 func (s *Store) Exist(ctx context.Context, title string) (bool, error) {
 	row, err := s.db.QueryContext(ctx, selectExists, title)
 	if err != nil {
 		return false, err
 	}
-	defer row.Close()
+	defer func() { _ = row.Close() }()
 
 	if row != nil && row.Next() {
 		return true, nil
@@ -104,7 +92,7 @@ func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]News, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var (
 		ID           = new(int)
@@ -153,7 +141,7 @@ func (s *Store) GetUnpublished(ctx context.Context) (map[string]News, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var (
 		ID           = new(int)
