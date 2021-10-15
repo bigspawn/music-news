@@ -30,8 +30,6 @@ func main() {
 
 	go metrics(logger)
 
-	logger.Logf("[INFO] %v", opt)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

@@ -24,7 +24,16 @@ type Options struct {
 	ChatID     int64  `short:"c" long:"chat_id" env:"CHAT_ID" required:"true"`
 	DbURL      string `short:"d" long:"db_url" env:"DB_URL" required:"true"`
 	SongAPIKey string `long:"song_api_key" env:"SONG_API_KEY"`
+	ProxyType  string `long:"proxy_type" env:"PROXY_TYPE"`
 }
+
+type ProxyType string
+
+const (
+	ProxyTypeNone   ProxyType = ""
+	ProxyTypeSocks5 ProxyType = "SOCKS5"
+	ProxyTypeHttp   ProxyType = "HTTP"
+)
 
 type App struct {
 	store     *Store
@@ -164,7 +173,10 @@ func (a *App) runScrapers(ctx context.Context, opt *Options) error {
 		return err
 	}
 
-	client := newClient(dialer)
+	client, err := newClient(dialer, opt)
+	if err != nil {
+		return err
+	}
 
 	feedParser := gofeed.NewParser()
 	feedParser.Client = client
@@ -213,26 +225,38 @@ func newDialer(opt *Options) (proxy.Dialer, error) {
 		KeepAlive: 30 * time.Second,
 	}
 
-	if opt.ProxyURL == "" {
-		return defaultDialer, nil
+	if ProxyType(opt.ProxyType) == ProxyTypeSocks5 {
+		dialer, err := proxy.SOCKS5("tcp", opt.ProxyURL, &proxy.Auth{
+			User:     opt.User,
+			Password: opt.Passwd,
+		}, defaultDialer)
+		if err != nil {
+			return nil, err
+		}
+
+		return dialer, nil
 	}
 
-	dialer, err := proxy.SOCKS5("tcp", opt.ProxyURL, &proxy.Auth{
-		User:     opt.User,
-		Password: opt.Passwd,
-	}, defaultDialer)
-	if err != nil {
-		return nil, err
-	}
+	return defaultDialer, nil
 
-	return dialer, nil
 }
 
-func newClient(dialer proxy.Dialer) *http.Client {
+func newClient(dialer proxy.Dialer, opt *Options) (*http.Client, error) {
+	httpProxy := http.ProxyFromEnvironment
+
+	if ProxyType(opt.ProxyType) == ProxyTypeHttp {
+		proxyURL, err := url.Parse(opt.ProxyURL)
+		if err != nil {
+			return nil, err
+		}
+
+		httpProxy = http.ProxyURL(proxyURL)
+	}
+
 	return &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
+			Proxy: httpProxy,
 			DialContext: func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
 				return dialer.Dial(network, addr)
 			},
@@ -242,5 +266,5 @@ func newClient(dialer proxy.Dialer) *http.Client {
 			TLSHandshakeTimeout:   10 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		},
-	}
+	}, nil
 }
