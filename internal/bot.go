@@ -3,51 +3,17 @@ package internal
 import (
 	"context"
 	"fmt"
-	"net"
-	"net/http"
 	"net/url"
 	"sort"
 
 	"github.com/go-pkgz/lgr"
 	tbapi "github.com/go-telegram-bot-api/telegram-bot-api"
-	"golang.org/x/net/proxy"
 )
 
 type TelegramBot struct {
 	BotAPI *tbapi.BotAPI
 	ChatId int64
 	Lgr    lgr.L
-}
-
-func NewTelegramBotAPI(p *Options, lgr lgr.L) (*TelegramBot, error) {
-	var err error
-	var bot *tbapi.BotAPI
-	if p.ProxyURL != "" {
-		dialer, err := proxy.SOCKS5("tcp", p.ProxyURL, &proxy.Auth{User: p.User, Password: p.Passwd}, proxy.Direct)
-		if err != nil {
-			return nil, err
-		}
-		bot, err = tbapi.NewBotAPIWithClient(p.BotID, &http.Client{
-			Transport: &http.Transport{
-				DialContext: func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
-					return dialer.Dial(network, addr)
-				},
-			},
-		})
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		bot, err = tbapi.NewBotAPI(p.BotID)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return &TelegramBot{
-		BotAPI: bot,
-		ChatId: p.ChatID,
-		Lgr:    lgr,
-	}, nil
 }
 
 func (b *TelegramBot) SendNews(_ context.Context, item News) error {

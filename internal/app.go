@@ -40,12 +40,7 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 		return nil, err
 	}
 
-	dialer, err := newDialer(opt)
-	if err != nil {
-		return nil, err
-	}
-
-	bot, err := tbapi.NewBotAPIWithClient(opt.BotID, newClient(dialer))
+	bot, err := tbapi.NewBotAPI(opt.BotID)
 	if err != nil {
 		return nil, err
 	}
