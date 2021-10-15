@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/go-pkgz/lgr"
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	tbapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
 
 const notifiesTimeout = time.Second
@@ -14,62 +14,53 @@ const notifiesTimeout = time.Second
 var platforms = []Platform{TidalPlatform, SpotifyPlatform, ItunesPlatform, YandexPlatform}
 
 type Notifier struct {
-	store *Store
-	bot   *TelegramBot
-	links *LinksApi
-	lgr   lgr.L
-}
-
-func NewNotifier(s *Store, bot *TelegramBot, links *LinksApi, lgr lgr.L) *Notifier {
-	return &Notifier{
-		store: s,
-		bot:   bot,
-		links: links,
-		lgr:   lgr,
-	}
+	Store  *Store
+	BotAPI *TelegramBot
+	Links  *LinksApi
+	Lgr    lgr.L
 }
 
 func (n *Notifier) Notify(ctx context.Context) error {
-	items, err := n.store.GetWithNotifyFlag(ctx)
+	items, err := n.Store.GetWithNotifyFlag(ctx)
 	if err != nil {
 		return err
 	}
 
 	for _, item := range items {
-		n.lgr.Logf("[INFO] prepare notification: title=%s", item.Title)
+		n.Lgr.Logf("[INFO] prepare notification: title=%s", item.Title)
 
-		releaseLink, linksByPlatform, err := n.links.GetLinks(ctx, item.Title)
+		releaseLink, linksByPlatform, err := n.Links.GetLinks(ctx, item.Title)
 		if err != nil {
-			n.lgr.Logf("[ERROR] getting link: title=%s, err=%v", item.Title, err)
+			n.Lgr.Logf("[ERROR] getting link: title=%s, err=%v", item.Title, err)
 			continue
 		}
 
-		n.lgr.Logf("[INFO] platforms=%s", linksByPlatform)
+		n.Lgr.Logf("[INFO] platforms=%s", linksByPlatform)
 
 		links, err := validatePlatforms(linksByPlatform)
 		if err != nil {
-			n.lgr.Logf("[ERROR] validate platforms: title=%s, err=%v", item.Title, err)
+			n.Lgr.Logf("[ERROR] validate platforms: title=%s, err=%v", item.Title, err)
 			continue
 		}
 
-		if err := n.bot.SendReleaseWithButtons(item, releaseLink, links); err != nil {
-			if bErr, ok := err.(tgbotapi.Error); ok {
+		if err := n.BotAPI.SendReleaseWithButtons(item, releaseLink, links); err != nil {
+			if bErr, ok := err.(tbapi.Error); ok {
 				time.Sleep(time.Duration(bErr.RetryAfter) * time.Second)
 
-				err = n.bot.SendReleaseWithButtons(item, releaseLink, links)
+				err = n.BotAPI.SendReleaseWithButtons(item, releaseLink, links)
 				if err != nil {
-					n.lgr.Logf("[ERROR] sending: title=%s, err=%v", item.Title, err)
+					n.Lgr.Logf("[ERROR] sending: title=%s, err=%v", item.Title, err)
 
 					continue
 				}
 			} else {
-				n.lgr.Logf("[ERROR] sending: title=%s, err=%v", item.Title, err)
+				n.Lgr.Logf("[ERROR] sending: title=%s, err=%v", item.Title, err)
 				continue
 			}
 		}
 
-		if err := n.store.UpdateNotifyFlag(ctx, item); err != nil {
-			n.lgr.Logf("[ERROR] update notify flag: title=%s, err=%v", item.Title, err)
+		if err := n.Store.UpdateNotifyFlag(ctx, item); err != nil {
+			n.Lgr.Logf("[ERROR] update notify flag: title=%s, err=%v", item.Title, err)
 			continue
 		}
 

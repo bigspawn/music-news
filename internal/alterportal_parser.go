@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/go-pkgz/lgr"
@@ -19,21 +18,12 @@ const AlterportalRSSFeedURL = "https://alterportal.net/rss.xml"
 
 var newLinesRE = regexp.MustCompile("\n{2,}")
 
-func NewAlterportalParser(lgr lgr.L) ItemParser {
-	return &alterportalParser{
-		lgr: lgr,
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-	}
+type AlterPortalParser struct {
+	Lgr    lgr.L
+	Client *http.Client
 }
 
-type alterportalParser struct {
-	lgr    lgr.L
-	client *http.Client
-}
-
-func (p alterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error) {
+func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error) {
 	if strings.Contains(item.Link, "raznoe") ||
 		strings.Contains(item.Link, "video") ||
 		strings.Contains(item.Link, "neformat") {
@@ -55,7 +45,7 @@ func (p alterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 	req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
 	req.Header.Add("Accept-Language", "en-US,en;q=0.8,ru-RU;q=0.5,ru;q=0.3")
 
-	res, err := p.client.Do(req)
+	res, err := p.Client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +112,7 @@ func (p alterportalParser) Parse(ctx context.Context, item *gofeed.Item) (*News,
 	if len(news.DownloadLink) == 0 {
 		cntHtml, err := content.Html()
 		if err == nil {
-			p.lgr.Logf("[ERROR] download links not found: %s", cntHtml)
+			p.Lgr.Logf("[ERROR] download Links not found: %s", cntHtml)
 		}
 		return nil, ErrSkipItem
 	}

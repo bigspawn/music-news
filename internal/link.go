@@ -16,7 +16,7 @@ import (
 
 const (
 	iTunesSearchUrl = "https://itunes.apple.com/search?"
-	songLinksUrl    = "https://api.song.link/v1-alpha.1/links?"
+	songLinksUrl    = "https://api.song.link/v1-alpha.1/Links?"
 )
 
 var (
@@ -133,17 +133,9 @@ type Link struct {
 }
 
 type LinksApi struct {
-	client http.Client
-	key    string
-	lgr    lgr.L
-}
-
-func NewLinkApi(key string, lgr lgr.L) *LinksApi {
-	return &LinksApi{
-		client: http.Client{},
-		key:    key,
-		lgr:    lgr,
-	}
+	Client *http.Client
+	Key    string
+	Lgr    lgr.L
 }
 
 func (a *LinksApi) GetLink(ctx context.Context, title string) (string, error) {
@@ -161,7 +153,7 @@ func (a *LinksApi) getIDiTunes(_ context.Context, title string) (string, error) 
 		"entity":  entity,
 	}
 
-	resp, err := a.client.Get(iTunesSearchUrl + u.Encode())
+	resp, err := a.Client.Get(iTunesSearchUrl + u.Encode())
 	if err != nil {
 		return "", err
 	}
@@ -174,7 +166,7 @@ func (a *LinksApi) getIDiTunes(_ context.Context, title string) (string, error) 
 
 	id, err := getID(result.Results, title)
 	if err != nil {
-		a.lgr.Logf("[INFO] iTunes response: %v", result)
+		a.Lgr.Logf("[INFO] iTunes response: %v", result)
 		return "", err
 	}
 	return id, nil
@@ -210,11 +202,11 @@ func (a *LinksApi) getLinkByiTunesID(_ context.Context, id string) (string, erro
 		"platform":    platform,
 		"type":        entity,
 		"id":          []string{id},
-		"key":         []string{a.key},
+		"Key":         []string{a.Key},
 		"userCountry": country,
 	}
 
-	resp, err := a.client.Get(songLinksUrl + u.Encode())
+	resp, err := a.Client.Get(songLinksUrl + u.Encode())
 	if err != nil {
 		return "", err
 	}
@@ -244,11 +236,11 @@ func (a *LinksApi) GetSongLink(ctx context.Context, id string) (SongLinkResponse
 		"userCountry": country,
 	}
 
-	if a.key != "" {
-		u.Add("key", a.key)
+	if a.Key != "" {
+		u.Add("Key", a.Key)
 	}
 
-	resp, err := a.client.Get(songLinksUrl + u.Encode())
+	resp, err := a.Client.Get(songLinksUrl + u.Encode())
 	if err != nil {
 		return SongLinkResponse{}, err
 	}

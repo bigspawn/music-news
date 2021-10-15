@@ -4,6 +4,7 @@ import (
 	"context"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/go-co-op/gocron"
@@ -29,38 +30,46 @@ type App struct {
 	lgr       lgr.L
 	scheduler *gocron.Scheduler
 	ch        chan []News
+	bot       *TelegramBot
 }
 
 func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 	bot, err := NewTelegramBotAPI(opt, lgr)
 	if err != nil {
-		return nil, errors.Wrap(err, "init telegram bot api")
+		return nil, errors.Wrap(err, "init telegram BotAPI api")
 	}
 
 	store, err := NewNewsStore(opt.DbURL, lgr)
 	if err != nil {
-		return nil, errors.Wrap(err, "init store")
+		return nil, errors.Wrap(err, "init Store")
 	}
-
-	ch := make(chan []News)
-	scheduler := gocron.NewScheduler(time.Now().Location())
 
 	app := &App{
 		store:     store,
+		bot:       bot,
 		lgr:       lgr,
-		scheduler: scheduler,
-		ch:        ch,
+		scheduler: gocron.NewScheduler(time.Now().Location()),
+		ch:        make(chan []News),
 	}
 
 	if opt.Notify {
-		err = runNotifier(ctx, opt, lgr, store, bot, scheduler)
-	} else {
+		if err := app.runNotifier(ctx, opt); err != nil {
+			return nil, err
+		}
 
-		go NewPublisher(lgr, store, bot, ch).Start(ctx)
-
-		err = runScrapers(ctx, lgr, store, scheduler, ch, opt)
+		return app, nil
 	}
-	if err != nil {
+
+	publisher := &Publisher{
+		Lgr:    lgr,
+		NewsCh: app.ch,
+		BotAPI: bot,
+		Store:  store,
+	}
+
+	go publisher.Start(ctx)
+
+	if err := app.runScrapers(ctx, opt); err != nil {
 		return nil, err
 	}
 
@@ -80,48 +89,142 @@ func (a *App) Stop() {
 	close(a.ch)
 }
 
-func runNotifier(
-	ctx context.Context,
-	opt *Options,
-	lgr lgr.L,
-	store *Store,
-	bot *TelegramBot,
-	scheduler *gocron.Scheduler,
-) error {
-	linkApi := NewLinkApi(opt.SongAPIKey, lgr)
-	notifier := NewNotifier(store, bot, linkApi, lgr)
+func (a *App) runNotifier(ctx context.Context, opt *Options) error {
+	notifier := &Notifier{
+		Store:  a.store,
+		BotAPI: a.bot,
+		Links: &LinksApi{
+			Client: http.DefaultClient,
+			Key:    opt.SongAPIKey,
+			Lgr:    a.lgr,
+		},
+		Lgr: a.lgr,
+	}
 
-	_, err := scheduler.Every(3).Hour().Do(func() {
+	jobFun := func() {
 		if err := notifier.Notify(ctx); err != nil {
-			lgr.Logf("[ERROR] notifier %v", err)
+			a.lgr.Logf("[ERROR] notifier %v", err)
 		}
 
-		_, next := scheduler.NextRun()
-		lgr.Logf("[INFO] job next start %s", next)
-	})
+		_, next := a.scheduler.NextRun()
+		a.lgr.Logf("[INFO] job next start %s", next)
+	}
+
+	_, err := a.scheduler.Every(3).Hour().Do(jobFun)
 	return err
 }
 
-func runScrapers(ctx context.Context, lgr lgr.L, store *Store, scheduler *gocron.Scheduler,
-	ch chan []News, opt *Options) error {
-
-	d, err := proxy.SOCKS5("tcp", opt.ProxyURL, &proxy.Auth{
-		User:     opt.User,
-		Password: opt.Passwd,
-	}, &net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-	})
+func (a *App) runScrapers(ctx context.Context, opt *Options) error {
+	//--- AlterPortal
+	link, err := url.Parse(AlterportalRSSFeedURL)
 	if err != nil {
 		return err
 	}
 
-	client := &http.Client{
+	job := Job{
+		s: &Scraper{
+			parser: &Parser{
+				url:        AlterportalRSSFeedURL,
+				feedParser: gofeed.NewParser(),
+				store:      a.store,
+				lgr:        a.lgr,
+				itemParser: &AlterPortalParser{
+					Lgr:    a.lgr,
+					Client: http.DefaultClient,
+				},
+				siteLabel: link.Host,
+			},
+			lgr:       a.lgr,
+			ch:        a.ch,
+			store:     a.store,
+			withDelay: false,
+		},
+		sch:  a.scheduler,
+		name: "alterPortal",
+		lgr:  a.lgr,
+	}
+
+	_, err = a.scheduler.Every(15).Minutes().Do(job.Do, ctx)
+	if err != nil {
+		return err
+	}
+
+	//--- GetRockMusic
+	dialer, err := newDialer(opt)
+	if err != nil {
+		return err
+	}
+
+	client := newClient(dialer)
+
+	feedParser := gofeed.NewParser()
+	feedParser.Client = client
+
+	link, err = url.Parse(GetRockMusicRss)
+	if err != nil {
+		return err
+	}
+
+	job = Job{
+		s: &Scraper{
+			parser: &Parser{
+				url:        GetRockMusicRss,
+				feedParser: gofeed.NewParser(),
+				store:      a.store,
+				lgr:        a.lgr,
+				itemParser: &GetRockMusicParser{
+					Lgr:    a.lgr,
+					Client: client,
+				},
+				siteLabel: link.Host,
+				withDelay: true,
+			},
+			lgr:       a.lgr,
+			ch:        a.ch,
+			store:     a.store,
+			withDelay: true,
+		},
+		sch:  a.scheduler,
+		name: "getRockMusic",
+		lgr:  a.lgr,
+	}
+
+	_, err = a.scheduler.Every(35).Minutes().Do(job.Do, ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func newDialer(opt *Options) (proxy.Dialer, error) {
+	defaultDialer := &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	}
+
+	if opt.ProxyURL == "" {
+		return defaultDialer, nil
+	}
+
+	dialer, err := proxy.SOCKS5("tcp", opt.ProxyURL, &proxy.Auth{
+		User:     opt.User,
+		Password: opt.Passwd,
+	}, defaultDialer)
+	if err != nil {
+		return nil, err
+	}
+
+	return dialer, nil
+}
+
+func newClient(dialer proxy.Dialer) *http.Client {
+	return &http.Client{
 		Timeout: 30 * time.Second,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
-				return d.Dial(network, addr)
+				return dialer.Dial(network, addr)
 			},
 			ForceAttemptHTTP2:     true,
 			MaxIdleConns:          100,
@@ -130,28 +233,4 @@ func runScrapers(ctx context.Context, lgr lgr.L, store *Store, scheduler *gocron
 			ExpectContinueTimeout: 1 * time.Second,
 		},
 	}
-
-	feedParser := gofeed.NewParser()
-	feedParser.Client = client
-
-	var itemParser ItemParser
-	itemParser = NewAlterportalParser(lgr)
-	alterportalRssFeedParser := NewRssFeedParser(AlterportalRSSFeedURL, store, lgr, itemParser, feedParser)
-	alterportalScr := NewMusicScraper(alterportalRssFeedParser, lgr, ch, store, false)
-	alterportalJob := NewJob(alterportalScr, scheduler, "alterportal", lgr)
-	_, err = scheduler.Every(15).Minutes().Do(alterportalJob.Do, ctx)
-	if err != nil {
-		return err
-	}
-
-	itemParser = NewGetRockMusicParser(lgr, client)
-	getrockmusicRssFeedParser := NewRssFeedParser(GetRockMusicRss, store, lgr, itemParser, feedParser)
-	getrockmusicScr := NewMusicScraper(getrockmusicRssFeedParser, lgr, ch, store, true)
-	getrockmusicJob := NewJob(getrockmusicScr, scheduler, "getrockmusic", lgr)
-	_, err = scheduler.Every(35).Minutes().Do(getrockmusicJob.Do, ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

@@ -60,6 +60,7 @@ type Parser struct {
 	lgr        lgr.L
 	itemParser ItemParser
 	siteLabel  string
+	withDelay  bool
 }
 
 func (p *Parser) Parse(ctx context.Context) ([]News, error) {
@@ -106,17 +107,19 @@ func (p *Parser) Parse(ctx context.Context) ([]News, error) {
 
 		news = append(news, *n)
 
-		duration := time.Duration(RandBetween(max, min)) * time.Second
+		if p.withDelay {
+			duration := time.Duration(RandBetween(max, min)) * time.Second
 
-		p.lgr.Logf("[INFO] sleep: sec=%s", duration)
+			p.lgr.Logf("[INFO] sleep: sec=%s", duration)
 
-		t := time.NewTimer(duration)
-		t.Stop()
-
-		select {
-		case <-t.C:
-		case <-ctx.Done():
-			return nil, ctx.Err()
+			t := time.NewTimer(duration)
+			select {
+			case <-t.C:
+				t.Stop()
+			case <-ctx.Done():
+				t.Stop()
+				return nil, ctx.Err()
+			}
 		}
 	}
 

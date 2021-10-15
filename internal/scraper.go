@@ -16,22 +16,6 @@ type MusicScraper interface {
 	Scrape(ctx context.Context) error
 }
 
-func NewMusicScraper(
-	parser RssFeedParser,
-	lgr lgr.L,
-	ch chan<- []News,
-	s *Store,
-	withDelay bool,
-) MusicScraper {
-	return &Scraper{
-		parser:    parser,
-		lgr:       lgr,
-		ch:        ch,
-		store:     s,
-		withDelay: withDelay,
-	}
-}
-
 type Scraper struct {
 	parser    RssFeedParser
 	lgr       lgr.L
@@ -41,17 +25,19 @@ type Scraper struct {
 }
 
 func (s Scraper) Scrape(ctx context.Context) error {
-	sec := RandBetween(10*60, 1)
-	duration := time.Duration(sec) * time.Second
-	s.lgr.Logf("[INFO] sleep %s", duration)
+	if s.withDelay {
+		sec := RandBetween(10*60, 1)
+		duration := time.Duration(sec) * time.Second
+		s.lgr.Logf("[INFO] sleep %s", duration)
 
-	t := time.NewTimer(duration)
-	defer t.Stop()
+		t := time.NewTimer(duration)
+		defer t.Stop()
 
-	select {
-	case <-t.C:
-	case <-ctx.Done():
-		return nil
+		select {
+		case <-t.C:
+		case <-ctx.Done():
+			return nil
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, parsingTimeout)
