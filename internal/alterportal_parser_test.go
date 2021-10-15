@@ -20,7 +20,7 @@ func TestGetMetalParser_Parse(t *testing.T) {
 	// feed, err := gofeed.NewParser().ParseURL(rssFeed)
 	// require.NoError(t, err)
 
-	p := NewAlterportalParser(lgr.New(), http.DefaultClient)
+	p := NewAlterportalParser(lgr.New())
 	ctx := context.Background()
 	for _, i := range feed.Items {
 		result, err := p.Parse(ctx, i)

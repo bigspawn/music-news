@@ -21,23 +21,39 @@ func NewMusicScraper(
 	lgr lgr.L,
 	ch chan<- []News,
 	s *Store,
+	withDelay bool,
 ) MusicScraper {
-	return &scraper{
-		parser: parser,
-		lgr:    lgr,
-		ch:     ch,
-		store:  s,
+	return &Scraper{
+		parser:    parser,
+		lgr:       lgr,
+		ch:        ch,
+		store:     s,
+		withDelay: withDelay,
 	}
 }
 
-type scraper struct {
-	parser RssFeedParser
-	lgr    lgr.L
-	ch     chan<- []News
-	store  *Store
+type Scraper struct {
+	parser    RssFeedParser
+	lgr       lgr.L
+	ch        chan<- []News
+	store     *Store
+	withDelay bool
 }
 
-func (s scraper) Scrape(ctx context.Context) error {
+func (s Scraper) Scrape(ctx context.Context) error {
+	sec := RandBetween(10*60, 1)
+	duration := time.Duration(sec) * time.Second
+	s.lgr.Logf("[INFO] sleep %s", duration)
+
+	t := time.NewTimer(duration)
+	defer t.Stop()
+
+	select {
+	case <-t.C:
+	case <-ctx.Done():
+		return nil
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, parsingTimeout)
 	defer cancel()
 

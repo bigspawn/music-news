@@ -3,11 +3,14 @@ package internal
 import (
 	"context"
 	"errors"
+	"math/rand"
+	"net/url"
+	"time"
+
 	"github.com/go-pkgz/lgr"
 	"github.com/mmcdole/gofeed"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"net/url"
 )
 
 const siteLabel = "site"
@@ -32,15 +35,17 @@ type RssFeedParser interface {
 	Parse(ctx context.Context) ([]News, error)
 }
 
-func NewRssFeedParser(rssHost string, store *Store, lgr lgr.L, itemParser ItemParser) RssFeedParser {
+func NewRssFeedParser(rssHost string, store *Store, lgr lgr.L, itemParser ItemParser,
+	feedParser *gofeed.Parser) RssFeedParser {
+
 	link, err := url.Parse(rssHost)
 	if err != nil {
 		lgr.Logf("[FATAL] %w+", err)
 	}
 
-	return &parser{
+	return &Parser{
 		url:        rssHost,
-		feedParser: gofeed.NewParser(),
+		feedParser: feedParser,
 		store:      store,
 		lgr:        lgr,
 		itemParser: itemParser,
@@ -48,7 +53,7 @@ func NewRssFeedParser(rssHost string, store *Store, lgr lgr.L, itemParser ItemPa
 	}
 }
 
-type parser struct {
+type Parser struct {
 	url        string
 	feedParser *gofeed.Parser
 	store      *Store
@@ -57,11 +62,14 @@ type parser struct {
 	siteLabel  string
 }
 
-func (p parser) Parse(ctx context.Context) ([]News, error) {
+func (p *Parser) Parse(ctx context.Context) ([]News, error) {
 	feed, err := p.feedParser.ParseURL(p.url)
 	if err != nil {
 		return nil, err
 	}
+
+	min := 1
+	max := 15
 
 	news := make([]News, 0, len(feed.Items))
 	for _, item := range feed.Items {
@@ -97,7 +105,24 @@ func (p parser) Parse(ctx context.Context) ([]News, error) {
 		}
 
 		news = append(news, *n)
+
+		duration := time.Duration(RandBetween(max, min)) * time.Second
+
+		p.lgr.Logf("[INFO] sleep: sec=%s", duration)
+
+		t := time.NewTimer(duration)
+		t.Stop()
+
+		select {
+		case <-t.C:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 
-	return news, err
+	return news, nil
+}
+
+func RandBetween(max int, min int) int {
+	return rand.Intn(max-min+1) + min
 }

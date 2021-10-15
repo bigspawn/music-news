@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/go-pkgz/lgr"
@@ -18,10 +19,12 @@ const AlterportalRSSFeedURL = "https://alterportal.net/rss.xml"
 
 var newLinesRE = regexp.MustCompile("\n{2,}")
 
-func NewAlterportalParser(lgr lgr.L, client *http.Client) ItemParser {
+func NewAlterportalParser(lgr lgr.L) ItemParser {
 	return &alterportalParser{
-		lgr:    lgr,
-		client: client,
+		lgr: lgr,
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+		},
 	}
 }
 

@@ -26,7 +26,7 @@ type getRockMusicParser struct {
 	client *http.Client
 }
 
-func (p getRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error) {
+func (p *getRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error) {
 	news := &News{
 		Title:    strings.TrimSpace(item.Title),
 		PageLink: item.Link,

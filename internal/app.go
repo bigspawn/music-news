@@ -2,12 +2,15 @@ package internal
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"time"
 
 	"github.com/go-co-op/gocron"
 	"github.com/go-pkgz/lgr"
+	"github.com/mmcdole/gofeed"
 	"github.com/pkg/errors"
+	"golang.org/x/net/proxy"
 )
 
 type Options struct {
@@ -55,7 +58,7 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 
 		go NewPublisher(lgr, store, bot, ch).Start(ctx)
 
-		err = runScrapers(ctx, lgr, store, scheduler, ch)
+		err = runScrapers(ctx, lgr, store, scheduler, ch, opt)
 	}
 	if err != nil {
 		return nil, err
@@ -99,33 +102,53 @@ func runNotifier(
 	return err
 }
 
-func runScrapers(
-	ctx context.Context,
-	lgr lgr.L,
-	store *Store,
-	scheduler *gocron.Scheduler,
-	ch chan []News,
-) error {
-	client := &http.Client{
-		Timeout: 30 * time.Second,
+func runScrapers(ctx context.Context, lgr lgr.L, store *Store, scheduler *gocron.Scheduler,
+	ch chan []News, opt *Options) error {
+
+	d, err := proxy.SOCKS5("tcp", opt.ProxyURL, &proxy.Auth{
+		User:     opt.User,
+		Password: opt.Passwd,
+	}, &net.Dialer{
+		Timeout:   30 * time.Second,
+		KeepAlive: 30 * time.Second,
+	})
+	if err != nil {
+		return err
 	}
 
-	var err error
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			DialContext: func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
+				return d.Dial(network, addr)
+			},
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+	}
+
+	feedParser := gofeed.NewParser()
+	feedParser.Client = client
+
 	var itemParser ItemParser
-	itemParser = NewAlterportalParser(lgr, client)
-	alterportalRssFeedParser := NewRssFeedParser(AlterportalRSSFeedURL, store, lgr, itemParser)
-	alterportalScr := NewMusicScraper(alterportalRssFeedParser, lgr, ch, store)
+	itemParser = NewAlterportalParser(lgr)
+	alterportalRssFeedParser := NewRssFeedParser(AlterportalRSSFeedURL, store, lgr, itemParser, feedParser)
+	alterportalScr := NewMusicScraper(alterportalRssFeedParser, lgr, ch, store, false)
 	alterportalJob := NewJob(alterportalScr, scheduler, "alterportal", lgr)
-	_, err = scheduler.Every(30).Minutes().Do(alterportalJob.Do, ctx)
+	_, err = scheduler.Every(15).Minutes().Do(alterportalJob.Do, ctx)
 	if err != nil {
 		return err
 	}
 
 	itemParser = NewGetRockMusicParser(lgr, client)
-	getrockmusicRssFeedParser := NewRssFeedParser(GetRockMusicRss, store, lgr, itemParser)
-	getrockmusicScr := NewMusicScraper(getrockmusicRssFeedParser, lgr, ch, store)
+	getrockmusicRssFeedParser := NewRssFeedParser(GetRockMusicRss, store, lgr, itemParser, feedParser)
+	getrockmusicScr := NewMusicScraper(getrockmusicRssFeedParser, lgr, ch, store, true)
 	getrockmusicJob := NewJob(getrockmusicScr, scheduler, "getrockmusic", lgr)
-	_, err = scheduler.Every(32).Minutes().Do(getrockmusicJob.Do, ctx)
+	_, err = scheduler.Every(35).Minutes().Do(getrockmusicJob.Do, ctx)
 	if err != nil {
 		return err
 	}
