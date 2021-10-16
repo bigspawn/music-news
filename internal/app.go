@@ -86,6 +86,8 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 
 	go publisher.Start(ctx)
 
+	go processUnpublished(ctx, app, lgr)
+
 	if err := app.runScrapers(ctx, opt); err != nil {
 		return nil, err
 	}
@@ -190,7 +192,7 @@ func (a *App) runScrapers(ctx context.Context, opt *Options) error {
 		s: &Scraper{
 			parser: &Parser{
 				url:        GetRockMusicRss,
-				feedParser: gofeed.NewParser(),
+				feedParser: feedParser,
 				store:      a.store,
 				lgr:        a.lgr,
 				itemParser: &GetRockMusicParser{
@@ -198,12 +200,12 @@ func (a *App) runScrapers(ctx context.Context, opt *Options) error {
 					Client: client,
 				},
 				siteLabel: link.Host,
-				withDelay: true,
+				withDelay: false,
 			},
 			lgr:       a.lgr,
 			ch:        a.ch,
 			store:     a.store,
-			withDelay: true,
+			withDelay: false,
 			name:      "getRockMusic",
 		},
 		sch:  a.scheduler,
@@ -267,4 +269,17 @@ func newClient(dialer proxy.Dialer, opt *Options) (*http.Client, error) {
 			ExpectContinueTimeout: 1 * time.Second,
 		},
 	}, nil
+}
+
+func processUnpublished(ctx context.Context, app *App, lgr lgr.L) {
+	items, err := app.store.GetUnpublished(ctx)
+	if err != nil {
+		lgr.Logf("[ERROR] GetUnpublished: %v", err)
+	} else {
+		arr := make([]News, 0, len(items))
+		for _, v := range items {
+			arr = append(arr, v)
+		}
+		app.ch <- arr
+	}
 }

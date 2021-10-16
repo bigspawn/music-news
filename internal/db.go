@@ -30,8 +30,7 @@ const (
 	selectUnpublished = `	SELECT id, title, playlist, imageurl, date_time, downloadurl, pageurl
 							FROM main.news
 							WHERE posted = false
-							  AND created_at > now() - interval '4 week'
-							  AND created_at < now() - interval '1 minute'
+							  AND created_at > strftime('%Y-%m-%d %H:%M:%S+00:00', 'now', 'utc', '-1 months')
 							ORDER BY created_at`
 
 	updatePosted = `		UPDATE main.news 
