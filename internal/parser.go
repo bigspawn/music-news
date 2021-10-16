@@ -56,6 +56,7 @@ func (p *Parser) Parse(ctx context.Context) ([]News, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		if exist {
 			continue
 		}

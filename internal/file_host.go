@@ -16,6 +16,7 @@ var fileHosts = []string{
 	"filecrypt.cc",
 	"turb.cc",
 	"turbobit.net",
+	"coreradio.ru",
 }
 
 func isAllowedFileHost(host string) bool {

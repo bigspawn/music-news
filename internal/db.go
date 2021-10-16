@@ -46,11 +46,11 @@ const (
 type News struct {
 	ID           int
 	Title        string
+	DateTime     *time.Time
+	PageLink     string
 	Text         string
 	ImageLink    string
 	DownloadLink []string
-	PageLink     string
-	DateTime     *time.Time
 }
 
 type Store struct {

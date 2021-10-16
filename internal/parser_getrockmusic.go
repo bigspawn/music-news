@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	GetRockMusicHost = "https://getrockmusic.net"
-	GetRockMusicRss  = GetRockMusicHost + "/rss.xml"
+	GetRockMusicHost         = "https://getrockmusic.net"
+	GetRockMusicParserRssURL = GetRockMusicHost + "/rss.xml"
 )
 
 type GetRockMusicParser struct {
@@ -23,11 +23,7 @@ type GetRockMusicParser struct {
 }
 
 func (p *GetRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error) {
-	news := &News{
-		Title:    strings.TrimSpace(item.Title),
-		PageLink: item.Link,
-		DateTime: item.PublishedParsed,
-	}
+	news := NewNewsFromItem(item)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, item.Link, nil)
 	if err != nil {
@@ -64,20 +60,7 @@ func (p *GetRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*New
 	}
 
 	content := doc.Find("div.generalblock:nth-child(3)")
-	content.Find("a[href]").Each(func(_ int, s *goquery.Selection) {
-		href, exists := s.Attr("href")
-		if !exists {
-			return
-		}
-
-		if href == "" {
-			return
-		}
-
-		if isAllowedFileHost(href) {
-			news.DownloadLink = append(news.DownloadLink, href)
-		}
-	})
+	content.Find("a[href]").Each(DownloadLinkSelector(news))
 
 	if len(news.DownloadLink) == 0 {
 		cntHtml, err := content.Html()
@@ -97,10 +80,27 @@ func (p *GetRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*New
 		return nil, ErrSkipItem
 	}
 
-	news.Text = newLinesRE.ReplaceAllString(news.Text, "\n")
+	news.Text = regexpNL.ReplaceAllString(news.Text, "\n")
 	news.Text = trimLast(news.Text)
 
 	news.Text = news.Text[strings.Index(news.Text, "\n")+1:]
 
 	return news, nil
+}
+
+func DownloadLinkSelector(news *News) func(_ int, s *goquery.Selection) {
+	return func(_ int, s *goquery.Selection) {
+		href, exists := s.Attr("href")
+		if !exists {
+			return
+		}
+
+		if href == "" {
+			return
+		}
+
+		if isAllowedFileHost(href) {
+			news.DownloadLink = append(news.DownloadLink, href)
+		}
+	}
 }

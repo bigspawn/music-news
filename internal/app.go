@@ -134,8 +134,23 @@ func (a *App) runNotifier(ctx context.Context, opt *Options) error {
 }
 
 func (a *App) runScrapers(ctx context.Context, opt *Options) error {
-	//--- AlterPortal
-	link, err := url.Parse(AlterportalRSSFeedURL)
+	if err := runAlterPortal(ctx, a); err != nil {
+		return err
+	}
+
+	if err := runGetRockMusic(ctx, a, opt); err != nil {
+		return err
+	}
+
+	if err := runCoreRadio(ctx, a); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func runAlterPortal(ctx context.Context, a *App) error {
+	link, err := url.Parse(AlterPortalParserRssURL)
 	if err != nil {
 		return err
 	}
@@ -143,7 +158,7 @@ func (a *App) runScrapers(ctx context.Context, opt *Options) error {
 	job := Job{
 		s: &Scraper{
 			parser: &Parser{
-				url:        AlterportalRSSFeedURL,
+				url:        AlterPortalParserRssURL,
 				feedParser: gofeed.NewParser(),
 				store:      a.store,
 				lgr:        a.lgr,
@@ -169,7 +184,10 @@ func (a *App) runScrapers(ctx context.Context, opt *Options) error {
 		return err
 	}
 
-	//--- GetRockMusic
+	return nil
+}
+
+func runGetRockMusic(ctx context.Context, a *App, opt *Options) error {
 	dialer, err := newDialer(opt)
 	if err != nil {
 		return err
@@ -183,15 +201,15 @@ func (a *App) runScrapers(ctx context.Context, opt *Options) error {
 	feedParser := gofeed.NewParser()
 	feedParser.Client = client
 
-	link, err = url.Parse(GetRockMusicRss)
+	link, err := url.Parse(GetRockMusicParserRssURL)
 	if err != nil {
 		return err
 	}
 
-	job = Job{
+	job := Job{
 		s: &Scraper{
 			parser: &Parser{
-				url:        GetRockMusicRss,
+				url:        GetRockMusicParserRssURL,
 				feedParser: feedParser,
 				store:      a.store,
 				lgr:        a.lgr,
@@ -214,6 +232,44 @@ func (a *App) runScrapers(ctx context.Context, opt *Options) error {
 	}
 
 	_, err = a.scheduler.Every(35).Minutes().Do(job.Do, ctx)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func runCoreRadio(ctx context.Context, a *App) error {
+	link, err := url.Parse(CoreRadioParserRssURL)
+	if err != nil {
+		return err
+	}
+
+	job := Job{
+		s: &Scraper{
+			parser: &Parser{
+				url:        CoreRadioParserRssURL,
+				feedParser: gofeed.NewParser(),
+				store:      a.store,
+				lgr:        a.lgr,
+				itemParser: &CoreRadioParser{
+					Lgr:    a.lgr,
+					Client: http.DefaultClient,
+				},
+				siteLabel: link.Host,
+			},
+			lgr:       a.lgr,
+			ch:        a.ch,
+			store:     a.store,
+			withDelay: false,
+			name:      "coreRadio",
+		},
+		sch:  a.scheduler,
+		name: "coreRadio",
+		lgr:  a.lgr,
+	}
+
+	_, err = a.scheduler.Every(20).Minutes().Do(job.Do, ctx)
 	if err != nil {
 		return err
 	}
