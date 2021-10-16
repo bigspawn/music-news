@@ -16,7 +16,7 @@ import (
 
 const AlterPortalParserRssURL = "https://alterportal.net/rss.xml"
 
-var regexpNL = regexp.MustCompile("\n{2,}")
+var moreThan2NewLinesRegexp = regexp.MustCompile("\n{2,}")
 
 type AlterPortalParser struct {
 	Lgr    lgr.L
@@ -129,7 +129,7 @@ func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 	}
 
 	news.Text = translate(news.Text)
-	news.Text = regexpNL.ReplaceAllString(news.Text, "\n")
+	news.Text = moreThan2NewLinesRegexp.ReplaceAllString(news.Text, "\n")
 	news.Text = strings.ReplaceAll(news.Text, "[ ] \n", "")
 	news.Text = strings.ReplaceAll(news.Text, ":: ", "")
 	news.Text = trimLast(news.Text)
@@ -138,8 +138,9 @@ func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 	return news, nil
 }
 
+var re = regexp.MustCompile("^\\d{1,3}[.\\s]*[\\s-–]")
+
 func trimLast(text string) string {
-	re := regexp.MustCompile("^\\d{1,3}[.\\s]*[\\s-–]")
 	lines := strings.Split(text, "\n")
 	var j int
 	for i := len(lines) - 1; i >= 0; i-- {

@@ -65,15 +65,28 @@ func (p *CoreRadioParser) Parse(ctx context.Context, item *gofeed.Item) (*News, 
 	}
 
 	// text
-	news.Text = strings.TrimSpace(doc.
-		Find("#dle-content > div.full-news > div.full-news-top > div.full-news-right > div.full-news-info").
-		Text())
+	content := doc.Find("#dle-content > div.full-news > div.full-news-top > div.full-news-right > div.full-news-info")
+
+	b := &strings.Builder{}
+	for _, n := range content.Nodes {
+		findText(n, b)
+	}
+	news.Text = strings.TrimSpace(b.String())
 
 	if isSkippedGender(p.Lgr, news.Text) {
 		return nil, ErrSkipItem
 	}
 
-	news.Text = regexpNL.ReplaceAllString(news.Text, "\n")
+	news.Text = moreThan2NewLinesRegexp.ReplaceAllString(news.Text, "\n")
+
+	b = &strings.Builder{}
+	for _, s := range strings.Split(news.Text, "\n") {
+		if s[0] != '.' {
+			b.WriteString(strings.TrimSpace(s))
+			b.WriteRune('\n')
+		}
+	}
+	news.Text = strings.TrimSpace(b.String())
 
 	return news, nil
 }

@@ -134,7 +134,7 @@ func (a *App) runNotifier(ctx context.Context, opt *Options) error {
 }
 
 func (a *App) runScrapers(ctx context.Context, opt *Options) error {
-	if err := runAlterPortal(ctx, a); err != nil {
+	if err := runCoreRadio(ctx, a); err != nil {
 		return err
 	}
 
@@ -142,7 +142,7 @@ func (a *App) runScrapers(ctx context.Context, opt *Options) error {
 		return err
 	}
 
-	if err := runCoreRadio(ctx, a); err != nil {
+	if err := runAlterPortal(ctx, a); err != nil {
 		return err
 	}
 

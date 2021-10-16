@@ -80,7 +80,7 @@ func (p *GetRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*New
 		return nil, ErrSkipItem
 	}
 
-	news.Text = regexpNL.ReplaceAllString(news.Text, "\n")
+	news.Text = moreThan2NewLinesRegexp.ReplaceAllString(news.Text, "\n")
 	news.Text = trimLast(news.Text)
 
 	news.Text = news.Text[strings.Index(news.Text, "\n")+1:]

@@ -16,8 +16,9 @@
 .idea/
 .archive/
 .run/
-tmp
-local
+tmp/
+local/
+music-news-db/
 
 docker-compose-*.yml
 sql/postgres_public_news_dump.sql

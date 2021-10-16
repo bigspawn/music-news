@@ -6,12 +6,13 @@ import (
 	"os"
 	"testing"
 
+	"github.com/go-pkgz/lgr"
 	"github.com/mmcdole/gofeed"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCoreRadioParser_Parse(t *testing.T) {
-	t.Skip()
+	t.Skip("local integration test")
 
 	is := require.New(t)
 
@@ -23,11 +24,15 @@ func TestCoreRadioParser_Parse(t *testing.T) {
 
 	p := &CoreRadioParser{
 		Client: http.DefaultClient,
+		Lgr:    lgr.Default(),
 	}
 
 	for _, item := range feed.Items {
 		n, err := p.Parse(context.Background(), item)
-		is.NoError(err)
+		//is.NoError(err)
+		if err != nil {
+			continue
+		}
 		t.Logf("%v\n", n)
 
 		is.NotEmpty(n.Title)
@@ -36,8 +41,6 @@ func TestCoreRadioParser_Parse(t *testing.T) {
 		is.NotEmpty(n.ImageLink)
 		is.NotEmpty(n.DownloadLink)
 		is.NotEmpty(n.Text)
-
-		break
 	}
 }
 
