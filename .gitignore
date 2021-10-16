@@ -16,9 +16,10 @@
 .idea/
 .archive/
 .run/
+tmp
+local
 
 docker-compose-*.yml
 sql/postgres_public_news_dump.sql
 docker-compose-*.yml.save
 *.sqlite
-local/.env

@@ -1,2 +1,5 @@
 .archive
 *.sqlite
+tmp
+local
+sql
