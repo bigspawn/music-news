@@ -33,6 +33,7 @@ var skipGenders = []string{
 	"Rockabilly",
 	"Skate Punk",
 	"Street Punk",
+	"Genre: Punk 'N' Roll",
 }
 
 func isSkippedGender(l lgr.L, data string) bool {

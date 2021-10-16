@@ -14,9 +14,9 @@ import (
 	"golang.org/x/net/html"
 )
 
-const AlterportalRSSFeedURL = "https://alterportal.net/rss.xml"
+const AlterPortalParserRssURL = "https://alterportal.net/rss.xml"
 
-var newLinesRE = regexp.MustCompile("\n{2,}")
+var regexpNL = regexp.MustCompile("\n{2,}")
 
 type AlterPortalParser struct {
 	Lgr    lgr.L
@@ -129,7 +129,7 @@ func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 	}
 
 	news.Text = translate(news.Text)
-	news.Text = newLinesRE.ReplaceAllString(news.Text, "\n")
+	news.Text = regexpNL.ReplaceAllString(news.Text, "\n")
 	news.Text = strings.ReplaceAll(news.Text, "[ ] \n", "")
 	news.Text = strings.ReplaceAll(news.Text, ":: ", "")
 	news.Text = trimLast(news.Text)
