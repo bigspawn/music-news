@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -43,7 +44,16 @@ func (p *CoreRadioParser) Parse(ctx context.Context, item *gofeed.Item) (*News, 
 		Find("#dle-content > div.full-news > div.full-news-top > div.full-news-left > center > a > img").
 		Attr("src")
 	if !ok {
-		return nil, fmt.Errorf("coreradio: Find: image: not found: link=%s", item.Link)
+
+		itemDoc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(item.Description))
+		if err != nil {
+			return nil, fmt.Errorf("coreradio: NewDocumentFromReader: Description: %v", err)
+		}
+
+		news.ImageLink, ok = itemDoc.Find("img[src]").Attr("src")
+		if !ok {
+			return nil, fmt.Errorf("coreradio: Find: image: not found: link=%s", item.Link)
+		}
 	}
 
 	// download link

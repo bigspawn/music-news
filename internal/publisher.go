@@ -38,7 +38,7 @@ func (p *Publisher) publish(ctx context.Context, items []News) error {
 
 				id, err = p.BotAPI.SendImage(ctx, item)
 				if err != nil {
-					p.Lgr.Logf("[ERROR] send image: %v", err)
+					p.Lgr.Logf("[ERROR] send image: %v: url=%s", err, item.ImageLink)
 					continue
 				}
 			} else {
