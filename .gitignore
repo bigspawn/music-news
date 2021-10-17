@@ -13,12 +13,13 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-.idea/
-.archive/
-.run/
-tmp/
-local/
-music-news-db/
+/.idea/
+/.archive/
+/.run/
+/tmp/
+/local/
+/music-news-db/
+/music-news-db_archive/
 
 docker-compose-*.yml
 sql/postgres_public_news_dump.sql
