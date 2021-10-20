@@ -50,8 +50,9 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 	}
 
 	b, err := tb.NewBot(tb.Settings{
-		Token:  opt.BotID,
-		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
+		Token:     opt.BotID,
+		Poller:    &tb.LongPoller{Timeout: 10 * time.Second},
+		ParseMode: tb.ModeHTML,
 	})
 	if err != nil {
 		return nil, err
