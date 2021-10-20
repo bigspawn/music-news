@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/go-pkgz/lgr"
@@ -158,6 +159,10 @@ func (api *BotAPI) SendReleaseNews(ctx context.Context, n ReleaseNews) (int, err
 
 		rows = append(rows, tb.InlineButton{Text: string(platform), URL: linkURL})
 	}
+
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i].Text > rows[j].Text
+	})
 
 	msg, err := api.Bot.Send(api.ChantID, text, &tb.ReplyMarkup{
 		InlineKeyboard: [][]tb.InlineButton{rows},
