@@ -72,18 +72,10 @@ func (s *Store) Exist(ctx context.Context, title string) (bool, error) {
 }
 
 func (s *Store) Insert(ctx context.Context, n News) error {
-	var userID int
-
-	row := s.db.QueryRowContext(ctx, insertQuery,
-		n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0], n.PageLink, false, time.Now())
-
-	if err := row.Scan(&userID); err != nil {
-		return err
-	}
-
-	s.lgr.Logf("[DEBUG] insert %v", n)
-
-	return nil
+	var id int
+	row := s.db.QueryRowContext(ctx, insertQuery, n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0],
+		n.PageLink, false, time.Now().UTC())
+	return row.Scan(&id)
 }
 
 func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]News, error) {
