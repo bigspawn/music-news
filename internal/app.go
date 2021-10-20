@@ -10,9 +10,9 @@ import (
 
 	"github.com/go-co-op/gocron"
 	"github.com/go-pkgz/lgr"
-	tbapi "github.com/go-telegram-bot-api/telegram-bot-api"
 	"github.com/mmcdole/gofeed"
 	"golang.org/x/net/proxy"
+	tb "gopkg.in/tucnak/telebot.v2"
 )
 
 type Options struct {
@@ -40,7 +40,7 @@ type App struct {
 	lgr       lgr.L
 	scheduler *gocron.Scheduler
 	ch        chan []News
-	bot       *TelegramBot
+	bot       *RetryableBotApi
 }
 
 func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
@@ -49,7 +49,10 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 		return nil, err
 	}
 
-	bot, err := tbapi.NewBotAPI(opt.BotID)
+	b, err := tb.NewBot(tb.Settings{
+		Token:  opt.BotID,
+		Poller: &tb.LongPoller{Timeout: 10 * time.Second},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -59,10 +62,12 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 			db:  db,
 			lgr: lgr,
 		},
-		bot: &TelegramBot{
-			BotAPI: bot,
-			ChatId: opt.ChatID,
-			Lgr:    lgr,
+		bot: &RetryableBotApi{
+			Bot: BotAPI{
+				Bot:     b,
+				ChantID: tb.ChatID(opt.ChatID),
+			},
+			Lgr: lgr,
 		},
 		lgr:       lgr,
 		scheduler: gocron.NewScheduler(time.Now().Location()),

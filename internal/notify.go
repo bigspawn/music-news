@@ -6,16 +6,14 @@ import (
 	"time"
 
 	"github.com/go-pkgz/lgr"
-	tbapi "github.com/go-telegram-bot-api/telegram-bot-api"
+	"github.com/pkg/errors"
 )
-
-const notifiesTimeout = time.Second
 
 var platforms = []Platform{TidalPlatform, SpotifyPlatform, ItunesPlatform, YandexPlatform}
 
 type Notifier struct {
 	Store  *Store
-	BotAPI *TelegramBot
+	BotAPI *RetryableBotApi
 	Links  *LinksApi
 	Lgr    lgr.L
 }
@@ -27,44 +25,49 @@ func (n *Notifier) Notify(ctx context.Context) error {
 	}
 
 	for _, item := range items {
-		n.Lgr.Logf("[INFO] prepare notification: title=%s", item.Title)
-
-		releaseLink, linksByPlatform, err := n.Links.GetLinks(ctx, item.Title)
-		if err != nil {
-			n.Lgr.Logf("[ERROR] getting link: title=%s, err=%v", item.Title, err)
-			continue
-		}
-
-		n.Lgr.Logf("[INFO] platforms=%s", linksByPlatform)
-
-		links, err := validatePlatforms(linksByPlatform)
-		if err != nil {
-			n.Lgr.Logf("[ERROR] validate platforms: title=%s, err=%v", item.Title, err)
-			continue
-		}
-
-		if err := n.BotAPI.SendReleaseWithButtons(item, releaseLink, links); err != nil {
-			if bErr, ok := err.(tbapi.Error); ok {
-				time.Sleep(time.Duration(bErr.RetryAfter) * time.Second)
-
-				err = n.BotAPI.SendReleaseWithButtons(item, releaseLink, links)
-				if err != nil {
-					n.Lgr.Logf("[ERROR] sending: title=%s, err=%v", item.Title, err)
-
-					continue
-				}
-			} else {
-				n.Lgr.Logf("[ERROR] sending: title=%s, err=%v", item.Title, err)
-				continue
+		if err = n.notify(ctx, item); err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				return err
 			}
-		}
 
-		if err := n.Store.UpdateNotifyFlag(ctx, item); err != nil {
-			n.Lgr.Logf("[ERROR] update notify flag: title=%s, err=%v", item.Title, err)
+			n.Lgr.Logf("[ERROR] failed notify [%s] cause: %v", item.Title, err)
+
 			continue
 		}
+		n.Lgr.Logf("[INFO] notify was send [%s]", item.Title)
 
-		time.Sleep(notifiesTimeout)
+		duration := time.Duration(RandBetween(10_000, 1)) * time.Millisecond
+
+		n.Lgr.Logf("[INFO] sleep between next notify [%s]", duration)
+
+		WaitUntil(ctx, duration)
+	}
+
+	return nil
+}
+
+func (n *Notifier) notify(ctx context.Context, item News) error {
+	releaseLink, linksByPlatform, err := n.Links.GetLinks(ctx, item.Title)
+	if err != nil {
+		return errors.Wrap(err, "get platform links")
+	}
+
+	links, err := validatePlatforms(linksByPlatform)
+	if err != nil {
+		return errors.Wrap(err, "validate platform links")
+	}
+
+	err = n.BotAPI.SendReleaseNews(ctx, ReleaseNews{
+		News:          item,
+		ReleaseLink:   releaseLink,
+		PlatformLinks: links,
+	})
+	if err != nil {
+		return errors.Wrap(err, "send notify")
+	}
+
+	if err := n.Store.UpdateNotifyFlag(ctx, item); err != nil {
+		return errors.Wrap(err, "update store notify")
 	}
 
 	return nil

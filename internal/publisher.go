@@ -5,13 +5,12 @@ import (
 	"time"
 
 	"github.com/go-pkgz/lgr"
-	tbapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
 
 type Publisher struct {
 	Lgr    lgr.L
 	NewsCh <-chan []News
-	BotAPI *TelegramBot
+	BotAPI *RetryableBotApi
 	Store  *Store
 }
 
@@ -31,46 +30,24 @@ func (p *Publisher) Start(ctx context.Context) {
 
 func (p *Publisher) publish(ctx context.Context, items []News) error {
 	for _, item := range items {
-		id, err := p.BotAPI.SendImage(ctx, item)
-		if err != nil {
-			if bErr, ok := err.(tbapi.Error); ok {
-				time.Sleep(time.Duration(bErr.RetryAfter) * time.Second)
-
-				id, err = p.BotAPI.SendImage(ctx, item)
-				if err != nil {
-					p.Lgr.Logf("[ERROR] send image: %v: url=%s", err, item.ImageLink)
-					continue
-				}
-			} else {
-				p.Lgr.Logf("[ERROR] send image: %v", err)
-				continue
-			}
-		}
-
 		if err := p.BotAPI.SendNews(ctx, item); err != nil {
-			if bErr, ok := err.(tbapi.Error); ok {
-				time.Sleep(time.Duration(bErr.RetryAfter) * time.Second)
-
-				err = p.BotAPI.SendNews(ctx, item)
-				if err != nil {
-					p.Lgr.Logf("[ERROR] send news: %v", err)
-					_, _ = p.BotAPI.BotAPI.DeleteMessage(tbapi.NewDeleteMessage(p.BotAPI.ChatId, id))
-					continue
-				}
-			} else {
-				p.Lgr.Logf("[ERROR] send news: %v", err)
-				_, _ = p.BotAPI.BotAPI.DeleteMessage(tbapi.NewDeleteMessage(p.BotAPI.ChatId, id))
-				continue
-			}
+			p.Lgr.Logf("[ERROR] can't send news: item=%v, err=%v", item, err)
+			continue
 		}
 
 		if err := p.Store.SetPosted(ctx, item.Title); err != nil {
 			p.Lgr.Logf("[ERROR] can't set posted: item=%v, err=%v", item, err)
+			continue
 		}
 
-		p.Lgr.Logf("[INFO] item was send [%s]", item.Title)
+		p.Lgr.Logf("[INFO] news was send [%s]", item.Title)
 
-		time.Sleep(postItemTimeout)
+		duration := time.Duration(RandBetween(10_000, 1)) * time.Millisecond
+
+		p.Lgr.Logf("[INFO] sleep between next send [%s]", duration)
+
+		WaitUntil(ctx, duration)
 	}
+
 	return nil
 }
