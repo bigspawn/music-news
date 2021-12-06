@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
@@ -217,31 +216,4 @@ func (s *Store) GetAll(ctx context.Context) ([]News, error) {
 	}
 
 	return items, nil
-}
-
-func (s *Store) SetTitleHash(ctx context.Context, items []News) error {
-	b := strings.Builder{}
-	for i := range items {
-		b.WriteString("UPDATE main.news SET title_hash = '")
-		b.WriteString(items[i].TitleHash)
-		b.WriteString("' WHERE id = ")
-		b.WriteString(strconv.Itoa(items[i].ID))
-		b.WriteString(";\n")
-	}
-
-	result, err := s.db.ExecContext(ctx, b.String())
-	if err != nil {
-		return err
-	}
-
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rows != 1 {
-		return fmt.Errorf("expected to affect 1 row, affected %d", rows)
-	}
-
-	return nil
 }
