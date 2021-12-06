@@ -105,7 +105,7 @@ func NewNewsFromItem(item *gofeed.Item) *News {
 	return &News{
 		Title:    strings.TrimSpace(item.Title),
 		PageLink: item.Link,
-		DateTime: item.PublishedParsed,
+		DateTime: *item.PublishedParsed,
 	}
 }
 

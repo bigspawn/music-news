@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -40,17 +41,24 @@ const (
 	selectExists = `		SELECT * 
 							FROM main.news 
 							WHERE title LIKE '%' || $1 || '%'`
+
+	selectAll = `			SELECT id, title, date_time, downloadurl, imageurl, playlist, posted, notified, created_at
+							FROM main.news`
 )
 
 // News is an article structure.
 type News struct {
 	ID           int
 	Title        string
-	DateTime     *time.Time
+	DateTime     time.Time
+	DownloadLink []string
+	ImageLink    string
 	PageLink     string
 	Text         string
-	ImageLink    string
-	DownloadLink []string
+	Posted       bool
+	Notified     bool
+	CreatedAt    time.Time
+	TitleHash    string
 }
 
 type Store struct {
@@ -86,25 +94,25 @@ func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]News, error) {
 	defer func() { _ = rows.Close() }()
 
 	var (
-		ID           = new(int)
-		Title        = new(string)
-		Text         = new(string)
-		ImageLink    = new(string)
-		DownloadLink = new(string)
-		DateTime     = new(time.Time)
+		id           = new(int)
+		title        = new(string)
+		text         = new(string)
+		imageLink    = new(string)
+		downloadLink = new(string)
+		dateTime     = new(time.Time)
 		notifies     = make([]News, 0)
 	)
 	for rows.Next() {
-		if err := rows.Scan(ID, Title, Text, ImageLink, DateTime, DownloadLink); err != nil {
+		if err := rows.Scan(id, title, text, imageLink, dateTime, downloadLink); err != nil {
 			return nil, err
 		}
 		notifies = append(notifies, News{
-			ID:           *ID,
-			Title:        *Title,
-			Text:         *Text,
-			ImageLink:    *ImageLink,
-			DownloadLink: strings.Split(*DownloadLink, ","),
-			DateTime:     DateTime,
+			ID:           *id,
+			Title:        *title,
+			Text:         *text,
+			ImageLink:    *imageLink,
+			DownloadLink: strings.Split(*downloadLink, ","),
+			DateTime:     *dateTime,
 		})
 	}
 	return notifies, nil
@@ -154,7 +162,7 @@ func (s *Store) GetUnpublished(ctx context.Context) (map[string]News, error) {
 			Text:         *Text,
 			ImageLink:    *ImageLink,
 			DownloadLink: strings.Split(*DownloadLink, ","),
-			DateTime:     DateTime,
+			DateTime:     *DateTime,
 			PageLink:     *PageLink,
 		}
 		unpublished[n.Title] = n
@@ -176,5 +184,64 @@ func (s *Store) SetPosted(ctx context.Context, title string) error {
 	if rows != 1 {
 		return fmt.Errorf("expected to affect 1 row, affected %d", rows)
 	}
+	return nil
+}
+
+func (s *Store) GetAll(ctx context.Context) ([]News, error) {
+	rows, err := s.db.QueryContext(ctx, selectAll)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	items := make([]News, 0)
+	for rows.Next() {
+		var n News
+		var links string
+		err := rows.Scan(
+			&n.ID,
+			&n.Title,
+			&n.DateTime,
+			&links,
+			&n.ImageLink,
+			&n.Text,
+			&n.Posted,
+			&n.Notified,
+			&n.CreatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		n.DownloadLink = strings.Split(links, ",")
+		items = append(items, n)
+	}
+
+	return items, nil
+}
+
+func (s *Store) SetTitleHash(ctx context.Context, items []News) error {
+	b := strings.Builder{}
+	for i := range items {
+		b.WriteString("UPDATE main.news SET title_hash = '")
+		b.WriteString(items[i].TitleHash)
+		b.WriteString("' WHERE id = ")
+		b.WriteString(strconv.Itoa(items[i].ID))
+		b.WriteString(";\n")
+	}
+
+	result, err := s.db.ExecContext(ctx, b.String())
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows != 1 {
+		return fmt.Errorf("expected to affect 1 row, affected %d", rows)
+	}
+
 	return nil
 }

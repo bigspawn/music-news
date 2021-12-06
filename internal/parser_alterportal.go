@@ -34,7 +34,7 @@ func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 	news := &News{
 		Title:    strings.TrimSpace(item.Title),
 		PageLink: item.Link,
-		DateTime: item.PublishedParsed,
+		DateTime: *item.PublishedParsed,
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, item.Link, nil)

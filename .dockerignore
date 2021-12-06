@@ -1,6 +1,12 @@
-.archive
-*.sqlite
-tmp
-local
-sql
+/.idea/
+/.archive/
+/.run/
+/tmp/
+/local/
 /music-news-db/
+/music-news-db_archive/
+
+docker-compose-*.yml
+sql/postgres_public_news_dump.sql
+docker-compose-*.yml.save
+*.sqlite
