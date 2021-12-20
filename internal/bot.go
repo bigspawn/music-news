@@ -95,21 +95,26 @@ func (api *BotAPI) SendNews(ctx context.Context, n News) (int, error) {
 		return 0, err
 	}
 
-	downloadLinkURL, err := EncodeQuery(n.DownloadLink[0])
-	if err != nil {
-		return 0, err
+	keyboard := [][]tb.InlineButton{{{Text: "Site Page", URL: pageLinkURL}}}
+	for i, s := range n.DownloadLink {
+		l, err := EncodeQuery(s)
+		if err != nil {
+			return 0, err
+		}
+
+		if s == "" {
+			continue
+		}
+
+		keyboard[0] = append(keyboard[0], tb.InlineButton{
+			Text: fmt.Sprintf("Download_%d", i),
+			URL:  l,
+		})
 	}
 
 	text := fmt.Sprintf("%s\n%s", n.Title, n.Text)
 
-	msg, err := api.Bot.Send(api.ChantID, text, &tb.ReplyMarkup{
-		InlineKeyboard: [][]tb.InlineButton{
-			{
-				{Text: "Site Page", URL: pageLinkURL},
-				{Text: "Download", URL: downloadLinkURL},
-			},
-		},
-	})
+	msg, err := api.Bot.Send(api.ChantID, text, &tb.ReplyMarkup{InlineKeyboard: keyboard})
 	if err != nil {
 		return id, err
 	}
