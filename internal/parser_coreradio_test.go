@@ -89,6 +89,12 @@ func TestDecodeBase64(t *testing.T) {
 			want:    "s=https://vk.com/doc160118002_618474003?984K",
 			wantErr: false,
 		},
+		{
+			name:    "3",
+			s:       "aHR0cHM6Ly9jbG91ZC5tYWlsLnJ1L3B1YmxpYy9LdTVmL2trR0dnM1VzWg",
+			want:    "https://cloud.mail.ru/public/Ku5f/kkGGg3UsZ",
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

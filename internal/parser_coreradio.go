@@ -128,11 +128,11 @@ func GetPage(ctx context.Context, client *http.Client, link string) (*http.Respo
 }
 
 func DecodeBase64(s string) (string, error) {
-	bytes, err := base64.RawURLEncoding.DecodeString(s)
+	b, err := base64.RawURLEncoding.DecodeString(s)
 	if err != nil {
 		return "", err
 	}
-	return string(bytes), nil
+	return string(b), nil
 }
 
 func ExtractLink(s string) string {

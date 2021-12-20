@@ -2,8 +2,10 @@ package internal
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/url"
 	"regexp"
 	"strings"
 
@@ -105,9 +107,22 @@ func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 			return
 		}
 
-		if isAllowedFileHost(href) {
-			news.DownloadLink = append(news.DownloadLink, href)
+		if !isAllowedFileHost(href) {
+			return
 		}
+
+		if strings.Contains(href, alterportalHost) {
+			s, err := ExtractLinkAlt(href)
+			if err != nil {
+				return
+			}
+			href, err = DecodeBase64StdPadding(s)
+			if err != nil {
+				return
+			}
+		}
+
+		news.DownloadLink = append(news.DownloadLink, href)
 	})
 
 	if len(news.DownloadLink) == 0 {
@@ -136,6 +151,24 @@ func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 	news.Text = strings.TrimSpace(news.Text)
 
 	return news, nil
+}
+
+func ExtractLinkAlt(s string) (string, error) {
+	u, err := url.Parse(html.UnescapeString(s))
+	if err != nil {
+		return "", err
+	}
+
+	return u.Query().Get("url"), nil
+}
+
+func DecodeBase64StdPadding(s string) (string, error) {
+	b, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return "", err
+	}
+
+	return string(b), nil
 }
 
 var re = regexp.MustCompile("^\\d{1,3}[.\\s]*[\\s-–]")
