@@ -112,7 +112,7 @@ func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 		}
 
 		if strings.Contains(href, alterportalHost) {
-			s, err := ExtractLinkAlt(href)
+			s, err := ExtractLinkFromParamURL(href)
 			if err != nil {
 				return
 			}
@@ -153,7 +153,7 @@ func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 	return news, nil
 }
 
-func ExtractLinkAlt(s string) (string, error) {
+func ExtractLinkFromParamURL(s string) (string, error) {
 	u, err := url.Parse(html.UnescapeString(s))
 	if err != nil {
 		return "", err

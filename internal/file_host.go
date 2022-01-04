@@ -2,7 +2,10 @@ package internal
 
 import "strings"
 
-const alterportalHost = "alterportal.net"
+const (
+	alterportalHost  = "alterportal.net"
+	getrockmusicHost = "getrockmusic.net"
+)
 
 var fileHosts = []string{
 	"mediafire.com",
@@ -20,6 +23,7 @@ var fileHosts = []string{
 	"turbobit.net",
 	"coreradio.ru",
 	alterportalHost,
+	getrockmusicHost,
 }
 
 func isAllowedFileHost(host string) bool {

@@ -99,8 +99,22 @@ func DownloadLinkSelector(news *News) func(_ int, s *goquery.Selection) {
 			return
 		}
 
-		if isAllowedFileHost(href) {
-			news.DownloadLink = append(news.DownloadLink, href)
+		if !isAllowedFileHost(href) {
+			return
 		}
+
+		if strings.Contains(href, getrockmusicHost) {
+			s, err := ExtractLinkFromParamURL(href)
+			if err != nil {
+				return
+			}
+
+			href, err = DecodeBase64StdPadding(s)
+			if err != nil {
+				return
+			}
+		}
+
+		news.DownloadLink = append(news.DownloadLink, href)
 	}
 }
