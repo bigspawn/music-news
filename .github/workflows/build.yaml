@@ -34,4 +34,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/${{ github.actor }}/${{ env.IMAGE_NAME }}:latest
+          tags: ghcr.io/${{ env.IMAGE_NAME }}:latest
