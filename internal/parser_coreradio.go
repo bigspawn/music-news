@@ -81,7 +81,19 @@ func (p *CoreRadioParser) Parse(ctx context.Context, item *gofeed.Item) (*News, 
 	for _, n := range content.Nodes {
 		findText(n, b)
 	}
+
 	news.Text = strings.TrimSpace(b.String())
+
+	var last int
+	for i, r := range news.Text {
+		if r == '\n' && i < len(news.Text)-1 {
+			last = i
+		}
+	}
+
+	if last > 0 {
+		news.Text = news.Text[:last]
+	}
 
 	if isSkippedGender(p.Lgr, news.Text) {
 		return nil, ErrSkipItem
