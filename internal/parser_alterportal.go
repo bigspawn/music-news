@@ -194,17 +194,16 @@ func findText(node *html.Node, builder *strings.Builder) {
 	if node == nil {
 		return
 	}
-	if node.Type == html.TextNode {
+	if node.Type == html.TextNode && node.Parent != nil && node.Parent.Data != "style" && node.Parent.Data != "a" &&
+		node.Parent.Data != "img" {
 		data := strings.TrimSpace(node.Data)
 		if needAddWord(data) {
 			builder.WriteString(data)
 			builder.WriteString(" ")
 		}
 	}
-	if node.Type == html.ElementNode {
-		if node.Data == "br" {
-			builder.WriteString("\n")
-		}
+	if node.Type == html.ElementNode && node.Data == "br" {
+		builder.WriteString("\n")
 	}
 	if node.FirstChild != nil {
 		findText(node.FirstChild, builder)
