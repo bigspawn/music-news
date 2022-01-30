@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/go-pkgz/lgr"
-	tb "gopkg.in/tucnak/telebot.v2"
+	tb "gopkg.in/telebot.v3"
 )
 
 type RetryableBotApi struct {

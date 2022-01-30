@@ -16,8 +16,8 @@ require (
 	github.com/prometheus/client_golang v1.10.0
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f
-	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/protobuf v1.25.0 // indirect
-	gopkg.in/tucnak/telebot.v2 v2.4.0
+	gopkg.in/telebot.v3 v3.0.0-20220130115853-f0291132d3c3
+	gopkg.in/tucnak/telebot.v2 v2.5.0
 )
