@@ -44,7 +44,6 @@ func (p *CoreRadioParser) Parse(ctx context.Context, item *gofeed.Item) (*News, 
 		Find("#dle-content > div.full-news > div.full-news-top > div.full-news-left > center > a > img").
 		Attr("src")
 	if !ok {
-
 		itemDoc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(item.Description))
 		if err != nil {
 			return nil, fmt.Errorf("coreradio: NewDocumentFromReader: Description: %v", err)
