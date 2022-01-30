@@ -19,5 +19,4 @@ require (
 	golang.org/x/text v0.3.7 // indirect
 	google.golang.org/protobuf v1.25.0 // indirect
 	gopkg.in/telebot.v3 v3.0.0-20220130115853-f0291132d3c3
-	gopkg.in/tucnak/telebot.v2 v2.5.0
 )

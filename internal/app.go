@@ -12,7 +12,7 @@ import (
 	"github.com/go-pkgz/lgr"
 	"github.com/mmcdole/gofeed"
 	"golang.org/x/net/proxy"
-	tb "gopkg.in/tucnak/telebot.v2"
+	tb "gopkg.in/telebot.v3"
 )
 
 type Options struct {
