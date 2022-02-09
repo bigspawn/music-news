@@ -7,15 +7,6 @@ import (
 	"github.com/go-pkgz/lgr"
 )
 
-func NewJob(s MusicScraper, sch *gocron.Scheduler, name string, lgr lgr.L) *Job {
-	return &Job{
-		s:    s,
-		sch:  sch,
-		name: name,
-		lgr:  lgr,
-	}
-}
-
 type Job struct {
 	s    MusicScraper
 	sch  *gocron.Scheduler
@@ -25,6 +16,8 @@ type Job struct {
 
 func (j Job) Do(ctx context.Context) {
 	if err := j.s.Scrape(ctx); err != nil {
+		StatusNotHealth()
+
 		j.lgr.Logf("[ERROR] %s scraper %v", j.name, err)
 	}
 

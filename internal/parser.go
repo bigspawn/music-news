@@ -41,7 +41,7 @@ type Parser struct {
 }
 
 func (p *Parser) Parse(ctx context.Context) ([]News, error) {
-	feed, err := p.feedParser.ParseURL(p.url)
+	feed, err := p.feedParser.ParseURLWithContext(p.url, ctx)
 	if err != nil {
 		return nil, err
 	}

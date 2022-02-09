@@ -2,6 +2,8 @@ package internal
 
 import (
 	"context"
+	"net"
+	"net/url"
 	"time"
 
 	"github.com/go-pkgz/lgr"
@@ -47,7 +49,15 @@ func (s Scraper) Scrape(ctx context.Context) error {
 
 	items, err := s.parser.Parse(ctx)
 	if err != nil {
+		if dnsErr, ok := err.(*net.DNSError); ok {
+			return dnsErr
+		}
+		if urlErr, ok := err.(*url.Error); ok {
+			return urlErr
+		}
+
 		s.lgr.Logf("[ERROR] can't parse: err=%v", err)
+
 		return nil
 	}
 

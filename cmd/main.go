@@ -28,7 +28,14 @@ func main() {
 		logger.Logf("[FATAL] parse flags err=%v", err)
 	}
 
-	go metrics(logger)
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		http.Handle("/health", health())
+
+		if err := http.ListenAndServe(":8080", nil); err != nil {
+			logger.Logf("[ERROR] metrics handler: err=%v", err)
+		}
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -40,6 +47,8 @@ func main() {
 
 	app.Start()
 
+	internal.StatusHealth()
+
 	ch := make(chan os.Signal)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 
@@ -49,9 +58,13 @@ func main() {
 	app.Stop()
 }
 
-func metrics(logger *lgr.Logger) {
-	http.Handle("/metrics", promhttp.Handler())
-	if err := http.ListenAndServe(":9091", nil); err != nil {
-		logger.Logf("[ERROR] metrics handler: err=%v", err)
-	}
+func health() http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		v := internal.GetStatus()
+		if v == 0 {
+			writer.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		writer.WriteHeader(http.StatusOK)
+	})
 }
