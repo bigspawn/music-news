@@ -45,7 +45,7 @@ func main() {
 		logger.Logf("[FATAL] init application: err=%v", err)
 	}
 
-	app.Start()
+	go app.Start()
 
 	internal.StatusHealth()
 
