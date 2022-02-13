@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -61,8 +62,8 @@ func (api *RetryableBotApi) SendReleaseNews(ctx context.Context, n ReleaseNews) 
 }
 
 func (api RetryableBotApi) retry(ctx context.Context, info interface{}, err error, f func() error) error {
-	floodErr, ok := err.(tb.FloodError)
-	if !ok {
+	var floodErr tb.FloodError
+	if !errors.As(err, &floodErr) {
 		return err
 	}
 

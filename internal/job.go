@@ -14,11 +14,10 @@ type Job struct {
 	lgr  lgr.L
 }
 
-func (j Job) Do(ctx context.Context) {
+func (j *Job) Do(ctx context.Context) {
 	if err := j.s.Scrape(ctx); err != nil {
-		StatusNotHealth()
-
 		j.lgr.Logf("[ERROR] %s scraper %v", j.name, err)
+		StatusNotHealth(j.lgr)
 	}
 
 	_, next := j.sch.NextRun()

@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/url"
 	"time"
@@ -9,10 +10,7 @@ import (
 	"github.com/go-pkgz/lgr"
 )
 
-const (
-	parsingTimeout  = 30 * time.Minute
-	postItemTimeout = 3 * time.Second
-)
+const parsingTimeout = 30 * time.Minute
 
 type MusicScraper interface {
 	Scrape(ctx context.Context) error
@@ -27,20 +25,10 @@ type Scraper struct {
 	name      string
 }
 
-func (s Scraper) Scrape(ctx context.Context) error {
+func (s *Scraper) Scrape(ctx context.Context) error {
 	if s.withDelay {
-		sec := RandBetween(10*60, 1)
-		duration := time.Duration(sec) * time.Second
-		s.lgr.Logf("[INFO] %s: sleep %s", s.name, duration)
-
-		t := time.NewTimer(duration)
-		defer t.Stop()
-
-		select {
-		case <-t.C:
-			// go
-		case <-ctx.Done():
-			return nil
+		if err := s.wait(ctx); err != nil {
+			return err
 		}
 	}
 
@@ -49,15 +37,11 @@ func (s Scraper) Scrape(ctx context.Context) error {
 
 	items, err := s.parser.Parse(ctx)
 	if err != nil {
-		if dnsErr, ok := err.(*net.DNSError); ok {
-			return dnsErr
-		}
-		if urlErr, ok := err.(*url.Error); ok {
-			return urlErr
-		}
-
 		s.lgr.Logf("[ERROR] can't parse: err=%v", err)
 
+		if netErr(err) {
+			return err
+		}
 		return nil
 	}
 
@@ -73,4 +57,57 @@ func (s Scraper) Scrape(ctx context.Context) error {
 	}()
 
 	return nil
+}
+
+func (s *Scraper) wait(ctx context.Context) error {
+	sec := RandBetween(10*60, 1)
+	duration := time.Duration(sec) * time.Second
+
+	s.lgr.Logf("[INFO] %s: sleep %s", s.name, duration)
+
+	t := time.NewTimer(duration)
+	defer t.Stop()
+
+	select {
+	case <-t.C:
+		// go
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	return nil
+}
+
+//nolint: errorlint // ok
+func netErr(err error) bool {
+	if ok := errors.Is(err, &net.DNSError{}); ok {
+		return ok
+	}
+	if ok := errors.Is(err, &net.OpError{}); ok {
+		return ok
+	}
+	if ok := errors.Is(err, &net.AddrError{}); ok {
+		return ok
+	}
+	if ok := errors.Is(err, &net.ParseError{}); ok {
+		return ok
+	}
+	if ok := errors.Is(err, &net.DNSConfigError{}); ok {
+		return ok
+	}
+	if ok := errors.Is(err, &url.Error{}); ok {
+		return ok
+	}
+	if _, ok := err.(net.InvalidAddrError); ok {
+		return ok
+	}
+	if _, ok := err.(net.UnknownNetworkError); ok {
+		return ok
+	}
+	if _, ok := err.(url.EscapeError); ok {
+		return ok
+	}
+	if _, ok := err.(url.InvalidHostError); ok {
+		return ok
+	}
+	return false
 }

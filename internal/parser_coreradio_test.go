@@ -29,7 +29,7 @@ func TestCoreRadioParser_Parse(t *testing.T) {
 
 	for _, item := range feed.Items {
 		n, err := p.Parse(context.Background(), item)
-		//is.NoError(err)
+		// is.NoError(err)
 		if err != nil {
 			continue
 		}

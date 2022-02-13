@@ -302,7 +302,6 @@ func newDialer(opt *Options) (proxy.Dialer, error) {
 	}
 
 	return defaultDialer, nil
-
 }
 
 func newClient(dialer proxy.Dialer, opt *Options) (*http.Client, error) {

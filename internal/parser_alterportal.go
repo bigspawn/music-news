@@ -171,7 +171,7 @@ func DecodeBase64StdPadding(s string) (string, error) {
 	return string(b), nil
 }
 
-var re = regexp.MustCompile("^\\d{1,3}[.\\s]*[\\s-–]")
+var re = regexp.MustCompile(`^\d{1,3}[.\s]*[\s-–]`)
 
 func trimLast(text string) string {
 	lines := strings.Split(text, "\n")

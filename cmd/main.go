@@ -47,9 +47,9 @@ func main() {
 
 	go app.Start()
 
-	internal.StatusHealth()
+	internal.StatusHealth(logger)
 
-	ch := make(chan os.Signal)
+	ch := make(chan os.Signal, 2)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 
 	logger.Logf("[INFO] system signal %s", <-ch)

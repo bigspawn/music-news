@@ -35,7 +35,7 @@ func (p *CoreRadioParser) Parse(ctx context.Context, item *gofeed.Item) (*News, 
 
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("coreradio: NewDocumentFromReader: %v", err)
+		return nil, fmt.Errorf("coreradio: NewDocumentFromReader: %w", err)
 	}
 
 	// image link
@@ -46,7 +46,7 @@ func (p *CoreRadioParser) Parse(ctx context.Context, item *gofeed.Item) (*News, 
 	if !ok {
 		itemDoc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(item.Description))
 		if err != nil {
-			return nil, fmt.Errorf("coreradio: NewDocumentFromReader: Description: %v", err)
+			return nil, fmt.Errorf("coreradio: NewDocumentFromReader: Description: %w", err)
 		}
 
 		news.ImageLink, ok = itemDoc.Find("img[src]").Attr("src")
@@ -153,8 +153,8 @@ func ExtractLink(s string) string {
 		slash       = "%2F"
 		slashLen    = len(slash)
 	)
-	s = strings.TrimLeft(s, engineURL)
-	s = strings.TrimRight(s, equalSymbol)
+	s = strings.TrimPrefix(s, engineURL)
+	s = strings.TrimSuffix(s, equalSymbol)
 	s = s[strings.Index(s, slash)+slashLen:]
 	return s
 }
