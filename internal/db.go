@@ -209,7 +209,7 @@ func (s *Store) SetPostedAndNotified(ctx context.Context, id int) error {
 }
 
 func (s *Store) exec(ctx context.Context, sql string, args ...interface{}) error {
-	result, err := s.db.ExecContext(ctx, sql, args)
+	result, err := s.db.ExecContext(ctx, sql, args...)
 	if err != nil {
 		return err
 	}
