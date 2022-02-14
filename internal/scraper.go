@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-pkgz/lgr"
@@ -39,7 +40,7 @@ func (s *Scraper) Scrape(ctx context.Context) error {
 	if err != nil {
 		s.lgr.Logf("[ERROR] can't parse: err=%v", err)
 
-		if netErr(err) {
+		if netErr(err) || strings.Contains(err.Error(), "network is unreachable") {
 			return err
 		}
 		return nil

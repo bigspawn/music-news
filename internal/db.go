@@ -43,6 +43,14 @@ const (
 
 	selectAll = `			SELECT id, title, date_time, downloadurl, imageurl, playlist, posted, notified, created_at
 							FROM main.news`
+
+	updatePostedByID = `	UPDATE main.news 
+							SET posted = true 
+							WHERE id = $1`
+
+	updatePostedAndNotifiedByID = `	UPDATE main.news 
+									SET posted = true, notified = true 
+									WHERE id = $1`
 )
 
 // News is an article structure.
@@ -118,20 +126,7 @@ func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]News, error) {
 }
 
 func (s *Store) UpdateNotifyFlag(ctx context.Context, item News) error {
-	result, err := s.db.ExecContext(ctx, updateNotified, item.ID)
-	if err != nil {
-		return err
-	}
-
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rows != 1 {
-		return fmt.Errorf("expected to affect 1 row, affected %d", rows)
-	}
-	return nil
+	return s.exec(ctx, updateNotified, item.ID)
 }
 
 func (s *Store) GetUnpublished(ctx context.Context) (map[string]News, error) {
@@ -170,20 +165,11 @@ func (s *Store) GetUnpublished(ctx context.Context) (map[string]News, error) {
 }
 
 func (s *Store) SetPosted(ctx context.Context, title string) error {
-	result, err := s.db.ExecContext(ctx, updatePosted, title)
-	if err != nil {
-		return err
-	}
+	return s.exec(ctx, updatePosted, title)
+}
 
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	if rows != 1 {
-		return fmt.Errorf("expected to affect 1 row, affected %d", rows)
-	}
-	return nil
+func (s *Store) SetPostedByID(ctx context.Context, id int) error {
+	return s.exec(ctx, updatePostedAndNotifiedByID, id)
 }
 
 func (s *Store) GetAll(ctx context.Context) ([]News, error) {
@@ -216,4 +202,25 @@ func (s *Store) GetAll(ctx context.Context) ([]News, error) {
 	}
 
 	return items, nil
+}
+
+func (s *Store) SetPostedAndNotified(ctx context.Context, id int) error {
+	return s.exec(ctx, updatePostedByID, id)
+}
+
+func (s *Store) exec(ctx context.Context, sql string, args ...interface{}) error {
+	result, err := s.db.ExecContext(ctx, sql, args)
+	if err != nil {
+		return err
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rows != 1 {
+		return fmt.Errorf("expected to affect 1 row, affected %d", rows)
+	}
+	return nil
 }
