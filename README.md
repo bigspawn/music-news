@@ -1,7 +1,12 @@
 # music-news
 
-This project consists two services.
+## Features
 
-First, parse rss feed, save in Postgres, then send news into the Telegram channel.
+- Parsing music news from sites.
+- Posting them to Telegram.
+- Posting links on music platforms.
 
-Second, send notification into another Telegram channel, when news (music album) will be release in iTunes. Links for streaming service given by API https://odesli.co/ 
+## Examples
+
+- https://t.me/albums_me_to_all
+- https://t.me/music_news_release
