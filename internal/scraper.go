@@ -46,8 +46,9 @@ func (s *Scraper) Scrape(ctx context.Context) error {
 		return nil
 	}
 
-	for _, item := range items {
-		if err := s.store.Insert(ctx, item); err != nil {
+	for i := range items {
+		items[i].ID, err = s.store.Insert(ctx, items[i])
+		if err != nil {
 			s.lgr.Logf("[ERROR] insert to db: %v", err)
 			continue
 		}

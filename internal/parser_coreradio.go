@@ -54,6 +54,7 @@ func (p *CoreRadioParser) Parse(ctx context.Context, item *gofeed.Item) (*News, 
 			return nil, fmt.Errorf("coreradio: Find: image: not found: link=%s", item.Link)
 		}
 	}
+	news.ImageLink = WebpToPng(news.ImageLink)
 
 	// download link
 	doc.
@@ -127,7 +128,7 @@ func GetPage(ctx context.Context, client *http.Client, link string) (*http.Respo
 	}
 
 	req.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0")
-	req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8")
+	req.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/png,*/*;q=0.8")
 	req.Header.Add("Accept-Language", "en-US,en;q=0.8,ru-RU;q=0.5,ru;q=0.3")
 
 	res, err := client.Do(req)

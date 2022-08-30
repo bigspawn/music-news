@@ -86,11 +86,24 @@ func (s *Store) Exist(ctx context.Context, title string) (bool, error) {
 	return false, nil
 }
 
-func (s *Store) Insert(ctx context.Context, n News) error {
+func (s *Store) Insert(ctx context.Context, n News) (int, error) {
 	var id int
-	row := s.db.QueryRowContext(ctx, insertQuery, n.Title, n.Text, n.DateTime, n.ImageLink, n.DownloadLink[0],
-		n.PageLink, false, time.Now().UTC())
-	return row.Scan(&id)
+	row := s.db.QueryRowContext(
+		ctx,
+		insertQuery,
+		n.Title,
+		n.Text,
+		n.DateTime,
+		n.ImageLink,
+		n.DownloadLink[0],
+		n.PageLink,
+		false,
+		time.Now().UTC(),
+	)
+	if err := row.Scan(&id); err != nil {
+		return -1, err
+	}
+	return id, nil
 }
 
 func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]News, error) {
@@ -169,7 +182,7 @@ func (s *Store) SetPosted(ctx context.Context, title string) error {
 }
 
 func (s *Store) SetPostedByID(ctx context.Context, id int) error {
-	return s.exec(ctx, updatePostedAndNotifiedByID, id)
+	return s.exec(ctx, updatePostedByID, id)
 }
 
 func (s *Store) GetAll(ctx context.Context) ([]News, error) {
@@ -205,7 +218,7 @@ func (s *Store) GetAll(ctx context.Context) ([]News, error) {
 }
 
 func (s *Store) SetPostedAndNotified(ctx context.Context, id int) error {
-	return s.exec(ctx, updatePostedByID, id)
+	return s.exec(ctx, updatePostedAndNotifiedByID, id)
 }
 
 func (s *Store) exec(ctx context.Context, sql string, args ...interface{}) error {
