@@ -5,11 +5,17 @@ import (
 	"fmt"
 	"time"
 
+	goOdesli "github.com/bigspawn/go-odesli"
 	"github.com/go-pkgz/lgr"
 	"github.com/pkg/errors"
 )
 
-var platforms = []Platform{TidalPlatform, SpotifyPlatform, ItunesPlatform, YandexPlatform}
+var platforms = []goOdesli.Platform{
+	goOdesli.PlatformTidal,
+	goOdesli.PlatformSpotify,
+	goOdesli.PlatformItunes,
+	goOdesli.PlatformYandex,
+}
 
 type Notifier struct {
 	Store  *Store
@@ -73,14 +79,14 @@ func (n *Notifier) notify(ctx context.Context, item News) error {
 	return nil
 }
 
-func validatePlatforms(byPlatform map[Platform]string) (map[Platform]string, error) {
-	links := make(map[Platform]string)
+func validatePlatforms(byPlatform map[goOdesli.Platform]string) (map[goOdesli.Platform]string, error) {
+	links := make(map[goOdesli.Platform]string)
 	for _, p := range platforms {
 		if l, ok := byPlatform[p]; ok {
 			links[p] = l
 			continue
 		}
-		if p == TidalPlatform || p == SpotifyPlatform || p == ItunesPlatform {
+		if p == goOdesli.PlatformTidal || p == goOdesli.PlatformSpotify || p == goOdesli.PlatformItunes {
 			return nil, fmt.Errorf("link for platform=%s not found", p)
 		}
 	}

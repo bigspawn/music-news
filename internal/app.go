@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"time"
 
+	itunes "github.com/bigspawn/go-itunes-api"
+	"github.com/bigspawn/go-odesli"
 	"github.com/go-co-op/gocron"
 	"github.com/go-pkgz/lgr"
 	"github.com/mmcdole/gofeed"
@@ -115,13 +117,23 @@ func (a *App) Stop() {
 }
 
 func (a *App) runNotifier(ctx context.Context, opt *Options) error {
+	itunesAPI, err := itunes.NewClient(itunes.ClientOption{})
+	if err != nil {
+		return err
+	}
+	odesliAPI, err := odesli.NewClient(odesli.ClientOption{
+		APIToken: opt.SongAPIKey,
+	})
+	if err != nil {
+		return err
+	}
 	notifier := &Notifier{
 		Store:  a.store,
 		BotAPI: a.bot,
 		Links: &LinksApi{
-			Client: http.DefaultClient,
-			Key:    opt.SongAPIKey,
 			Lgr:    a.lgr,
+			Itunes: itunesAPI,
+			Odesli: odesliAPI,
 		},
 		Lgr: a.lgr,
 	}
@@ -135,7 +147,7 @@ func (a *App) runNotifier(ctx context.Context, opt *Options) error {
 		a.lgr.Logf("[INFO] job next start %s", next)
 	}
 
-	_, err := a.scheduler.Every(3).Hour().Do(jobFun)
+	_, err = a.scheduler.Every(3).Hour().Do(jobFun)
 	return err
 }
 

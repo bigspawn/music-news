@@ -7,6 +7,7 @@ import (
 	"sort"
 	"time"
 
+	goOdesli "github.com/bigspawn/go-odesli"
 	"github.com/go-pkgz/lgr"
 	tb "gopkg.in/telebot.v3"
 )
@@ -145,7 +146,7 @@ type ReleaseNews struct {
 	News
 
 	ReleaseLink   string
-	PlatformLinks map[Platform]string
+	PlatformLinks map[goOdesli.Platform]string
 }
 
 func (api *BotAPI) SendReleaseNews(ctx context.Context, n ReleaseNews) (int, error) {
@@ -158,9 +159,9 @@ func (api *BotAPI) SendReleaseNews(ctx context.Context, n ReleaseNews) (int, err
 
 	rows := make([]tb.InlineButton, 0, len(n.DownloadLink))
 	for platform, link := range n.PlatformLinks {
-		linkURL, err := EncodeQuery(link)
-		if err != nil {
-			return id, err
+		linkURL, eErr := EncodeQuery(link)
+		if eErr != nil {
+			return id, eErr
 		}
 
 		rows = append(rows, tb.InlineButton{Text: string(platform), URL: linkURL})
