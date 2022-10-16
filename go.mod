@@ -14,6 +14,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/stretchr/testify v1.8.0
+	go.uber.org/automaxprocs v1.5.1
 	golang.org/x/net v0.0.0-20211015210444-4f30a5c0130f
 	gopkg.in/telebot.v3 v3.0.0-20220130115853-f0291132d3c3
 )

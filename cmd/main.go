@@ -13,6 +13,7 @@ import (
 	"github.com/jessevdk/go-flags"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/bigspawn/music-news/internal"
 )
@@ -21,6 +22,11 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	logger := lgr.New(lgr.Msec, lgr.Debug, lgr.CallerFile, lgr.CallerFunc)
+
+	_, err := maxprocs.Set(maxprocs.Logger(logger.Logf))
+	if err != nil {
+		logger.Logf("[FATAL] cant sent max proc err=%v", err)
+	}
 
 	opt := &internal.Options{}
 	p := flags.NewParser(opt, flags.Default)
