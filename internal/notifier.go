@@ -2,26 +2,46 @@ package internal
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	goOdesli "github.com/bigspawn/go-odesli"
 	"github.com/go-pkgz/lgr"
 	"github.com/pkg/errors"
 )
 
-var platforms = []goOdesli.Platform{
-	goOdesli.PlatformTidal,
-	goOdesli.PlatformSpotify,
-	goOdesli.PlatformItunes,
-	goOdesli.PlatformYandex,
-}
-
-type Notifier struct {
+type NotifierParams struct {
+	Lgr    lgr.L
 	Store  *Store
 	BotAPI *RetryableBotApi
 	Links  *LinksApi
-	Lgr    lgr.L
+}
+
+func (p *NotifierParams) Validate() error {
+	if p.Lgr == nil {
+		return errors.New("lgr is nil")
+	}
+	if p.Store == nil {
+		return errors.New("store is nil")
+	}
+	if p.BotAPI == nil {
+		return errors.New("bot api is nil")
+	}
+	if p.Links == nil {
+		return errors.New("links api is nil")
+	}
+	return nil
+}
+
+type Notifier struct {
+	NotifierParams
+}
+
+func NewNotifier(params NotifierParams) (*Notifier, error) {
+	if err := params.Validate(); err != nil {
+		return nil, err
+	}
+	return &Notifier{
+		NotifierParams: params,
+	}, nil
 }
 
 func (n *Notifier) Notify(ctx context.Context) error {
@@ -58,7 +78,7 @@ func (n *Notifier) notify(ctx context.Context, item News) error {
 		return errors.Wrap(err, "get platform links")
 	}
 
-	links, err := validatePlatforms(linksByPlatform)
+	links, err := CheckRequiredPlatforms(linksByPlatform)
 	if err != nil {
 		return errors.Wrap(err, "validate platform links")
 	}
@@ -77,18 +97,4 @@ func (n *Notifier) notify(ctx context.Context, item News) error {
 	}
 
 	return nil
-}
-
-func validatePlatforms(byPlatform map[goOdesli.Platform]string) (map[goOdesli.Platform]string, error) {
-	links := make(map[goOdesli.Platform]string)
-	for _, p := range platforms {
-		if l, ok := byPlatform[p]; ok {
-			links[p] = l
-			continue
-		}
-		if p == goOdesli.PlatformTidal || p == goOdesli.PlatformSpotify || p == goOdesli.PlatformItunes {
-			return nil, fmt.Errorf("link for platform=%s not found", p)
-		}
-	}
-	return links, nil
 }

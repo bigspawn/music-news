@@ -68,13 +68,34 @@ type News struct {
 	TitleHash    string
 }
 
+type StoreParams struct {
+	Lgr lgr.L
+	DB  *sql.DB
+}
+
+func (p *StoreParams) Validate() error {
+	if p.DB == nil {
+		return fmt.Errorf("db is required")
+	}
+	if p.Lgr == nil {
+		return fmt.Errorf("lgr is required")
+	}
+	return nil
+}
+
 type Store struct {
-	db  *sql.DB
-	lgr lgr.L
+	StoreParams
+}
+
+func NewStore(params StoreParams) (*Store, error) {
+	if err := params.Validate(); err != nil {
+		return nil, err
+	}
+	return &Store{StoreParams: params}, nil
 }
 
 func (s *Store) Exist(ctx context.Context, title string) (bool, error) {
-	row, err := s.db.QueryContext(ctx, selectExists, title)
+	row, err := s.DB.QueryContext(ctx, selectExists, title)
 	if err != nil {
 		return false, err
 	}
@@ -88,7 +109,7 @@ func (s *Store) Exist(ctx context.Context, title string) (bool, error) {
 
 func (s *Store) Insert(ctx context.Context, n News) (int, error) {
 	var id int
-	row := s.db.QueryRowContext(
+	row := s.DB.QueryRowContext(
 		ctx,
 		insertQuery,
 		n.Title,
@@ -107,7 +128,7 @@ func (s *Store) Insert(ctx context.Context, n News) (int, error) {
 }
 
 func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]News, error) {
-	rows, err := s.db.QueryContext(ctx, selectNotified)
+	rows, err := s.DB.QueryContext(ctx, selectNotified)
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +164,7 @@ func (s *Store) UpdateNotifyFlag(ctx context.Context, item News) error {
 }
 
 func (s *Store) GetUnpublished(ctx context.Context) (map[string]News, error) {
-	rows, err := s.db.QueryContext(ctx, selectUnpublished)
+	rows, err := s.DB.QueryContext(ctx, selectUnpublished)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +207,7 @@ func (s *Store) SetPostedByID(ctx context.Context, id int) error {
 }
 
 func (s *Store) GetAll(ctx context.Context) ([]News, error) {
-	rows, err := s.db.QueryContext(ctx, selectAll)
+	rows, err := s.DB.QueryContext(ctx, selectAll)
 	if err != nil {
 		return nil, err
 	}
@@ -221,8 +242,14 @@ func (s *Store) SetPostedAndNotified(ctx context.Context, id int) error {
 	return s.exec(ctx, updatePostedAndNotifiedByID, id)
 }
 
+func (s *Store) Stop() {
+	if err := s.DB.Close(); err != nil {
+		s.Lgr.Logf("[ERROR] failed to close db connection: %v", err)
+	}
+}
+
 func (s *Store) exec(ctx context.Context, sql string, args ...interface{}) error {
-	result, err := s.db.ExecContext(ctx, sql, args...)
+	result, err := s.DB.ExecContext(ctx, sql, args...)
 	if err != nil {
 		return err
 	}

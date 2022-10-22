@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"math/rand"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -12,7 +11,6 @@ import (
 	"github.com/go-pkgz/lgr"
 	"github.com/jessevdk/go-flags"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/automaxprocs/maxprocs"
 
 	"github.com/bigspawn/music-news/internal"
@@ -34,14 +32,9 @@ func main() {
 		logger.Logf("[FATAL] parse flags err=%v", err)
 	}
 
-	go func() {
-		http.Handle("/metrics", promhttp.Handler())
-		http.Handle("/health", health())
+	logger.Logf("[INFO] start with options=%+v", opt)
 
-		if err := http.ListenAndServe(":8080", nil); err != nil {
-			logger.Logf("[ERROR] metrics handler: err=%v", err)
-		}
-	}()
+	go internal.StartHandlers(logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -51,7 +44,10 @@ func main() {
 		logger.Logf("[FATAL] init application: err=%v", err)
 	}
 
-	go app.Start()
+	err = app.Start(ctx)
+	if err != nil {
+		logger.Logf("[FATAL] start application: err=%v", err)
+	}
 
 	internal.StatusHealth(logger)
 
@@ -62,15 +58,4 @@ func main() {
 
 	cancel()
 	app.Stop()
-}
-
-func health() http.Handler {
-	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		v := internal.GetStatus()
-		if v == 0 {
-			writer.WriteHeader(http.StatusServiceUnavailable)
-			return
-		}
-		writer.WriteHeader(http.StatusOK)
-	})
 }

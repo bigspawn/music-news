@@ -14,10 +14,40 @@ import (
 
 var unusedSuffixRegexp = regexp.MustCompile(`\(\d+\)|([\[(][singleSINGLEpP]+[])])`)
 
+type LinksApiParams struct {
+	Lgr          lgr.L
+	ITunesClient itunes.API
+	OdesliClient odesli.API
+}
+
+func (p *LinksApiParams) Validate() error {
+	if p.Lgr == nil {
+		return fmt.Errorf("lgr is required")
+	}
+	if p.ITunesClient == nil {
+		return fmt.Errorf("itunes client is required")
+	}
+	if p.OdesliClient == nil {
+		return fmt.Errorf("odesli client is required")
+	}
+	return nil
+}
+
 type LinksApi struct {
 	Lgr    lgr.L
 	Itunes itunes.API
 	Odesli odesli.API
+}
+
+func NewLinksApi(params LinksApiParams) (*LinksApi, error) {
+	if err := params.Validate(); err != nil {
+		return nil, err
+	}
+	return &LinksApi{
+		Lgr:    params.Lgr,
+		Itunes: params.ITunesClient,
+		Odesli: params.OdesliClient,
+	}, nil
 }
 
 func (api *LinksApi) GetLinks(ctx context.Context, title string) (string, map[odesli.Platform]string, error) {

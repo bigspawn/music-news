@@ -3,7 +3,7 @@ package internal
 import (
 	"context"
 	"database/sql"
-	"net"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -13,346 +13,355 @@ import (
 	"github.com/go-co-op/gocron"
 	"github.com/go-pkgz/lgr"
 	"github.com/mmcdole/gofeed"
-	"golang.org/x/net/proxy"
 	tb "gopkg.in/telebot.v3"
 )
 
-type Options struct {
-	User       string `long:"user" env:"USER"`
-	Passwd     string `long:"passwd" env:"PASSWD"`
-	ProxyURL   string `long:"proxy_url" env:"PROXY_URL"`
-	Notify     bool   `short:"n" long:"notify" env:"NOTIFY"`
-	BotID      string `short:"b" long:"bot_id" env:"BOT_ID" required:"true"`
-	ChatID     int64  `short:"c" long:"chat_id" env:"CHAT_ID" required:"true"`
-	DbURL      string `short:"d" long:"db_url" env:"DB_URL" required:"true"`
-	SongAPIKey string `long:"song_api_key" env:"SONG_API_KEY"`
-	ProxyType  string `long:"proxy_type" env:"PROXY_TYPE"`
-}
-
-type ProxyType string
-
-const (
-	ProxyTypeNone   ProxyType = ""
-	ProxyTypeSocks5 ProxyType = "SOCKS5"
-	ProxyTypeHttp   ProxyType = "HTTP"
-)
-
 type App struct {
-	store     *Store
 	lgr       lgr.L
+	store     *Store
 	scheduler *gocron.Scheduler
 	ch        chan []News
-	bot       *RetryableBotApi
 }
 
 func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
-	db, err := sql.Open(driver, opt.DbURL)
+	db, err := sql.Open(driver, opt.DBUrl)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to open db: %w", err)
 	}
 
-	b, err := tb.NewBot(tb.Settings{
+	itunesAPI, err := itunes.NewClient(itunes.ClientOption{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create itunes api client: %w", err)
+	}
+
+	odesliAPI, err := odesli.NewClient(odesli.ClientOption{APIToken: opt.SongApiKey})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create odesli api client: %w", err)
+	}
+
+	links, err := NewLinksApi(LinksApiParams{
+		Lgr:          lgr,
+		ITunesClient: itunesAPI,
+		OdesliClient: odesliAPI,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create links api: %w", err)
+	}
+
+	store, err := NewStore(StoreParams{
+		Lgr: lgr,
+		DB:  db,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create store: %w", err)
+	}
+
+	bot, err := tb.NewBot(tb.Settings{
 		Token:     opt.BotID,
 		Poller:    &tb.LongPoller{Timeout: 10 * time.Second},
 		ParseMode: tb.ModeHTML,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create bot: %w", err)
 	}
 
-	app := &App{
-		store: &Store{
-			db:  db,
-			lgr: lgr,
-		},
-		bot: &RetryableBotApi{
-			Bot: BotAPI{
-				Bot:     b,
-				ChantID: tb.ChatID(opt.ChatID),
-			},
-			Lgr: lgr,
-		},
+	scheduler := gocron.NewScheduler(time.UTC)
+
+	_, err = createNotifier(ctx, lgr, opt, bot, store, links, scheduler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create notifier: %w", err)
+	}
+
+	var (
+		ch         = make(chan []News)
+		httpClient = NewHttpClient(NewDialer())
+	)
+
+	err = runCoreRadio(ctx, lgr, store, httpClient, ch, scheduler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run core radio scraper: %w", err)
+	}
+
+	err = runAlterPortal(ctx, lgr, store, httpClient, ch, scheduler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run alter portal scraper: %w", err)
+	}
+
+	err = runGetRockMusic(ctx, lgr, store, httpClient, ch, scheduler)
+	if err != nil {
+		return nil, fmt.Errorf("failed to run get rock music scraper: %w", err)
+	}
+
+	_, err = createPublisher(ctx, lgr, store, bot, opt, ch)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create publisher: %w", err)
+	}
+
+	return &App{
 		lgr:       lgr,
-		scheduler: gocron.NewScheduler(time.Now().Location()),
-		ch:        make(chan []News),
-	}
-
-	if opt.Notify {
-		if err := app.runNotifier(ctx, opt); err != nil {
-			return nil, err
-		}
-
-		return app, nil
-	}
-
-	publisher := &Publisher{
-		Lgr:    lgr,
-		NewsCh: app.ch,
-		BotAPI: app.bot,
-		Store:  app.store,
-	}
-
-	go publisher.Start(ctx)
-
-	go processUnpublished(ctx, app, lgr)
-
-	if err := app.runScrapers(ctx, opt); err != nil {
-		return nil, err
-	}
-
-	return app, nil
+		store:     store,
+		scheduler: scheduler,
+		ch:        ch,
+	}, nil
 }
 
-func (a *App) Start() {
-	a.scheduler.StartAsync()
+func (a *App) Start(_ context.Context) error {
+	go a.scheduler.StartAsync()
+	return nil
 }
 
 func (a *App) Stop() {
-	if err := a.store.db.Close(); err != nil {
-		a.lgr.Logf("[ERROR] stopped application: %w", err)
-	}
 	a.scheduler.Stop()
 	a.scheduler.Clear()
+	a.store.Stop()
 	close(a.ch)
 }
 
-func (a *App) runNotifier(ctx context.Context, opt *Options) error {
-	itunesAPI, err := itunes.NewClient(itunes.ClientOption{})
-	if err != nil {
-		return err
-	}
-	odesliAPI, err := odesli.NewClient(odesli.ClientOption{
-		APIToken: opt.SongAPIKey,
+func createNotifier(
+	ctx context.Context,
+	lgr lgr.L,
+	opt *Options,
+	bot *tb.Bot,
+	store *Store,
+	links *LinksApi,
+	scheduler *gocron.Scheduler,
+) (*Notifier, error) {
+	notifyBot, err := NewBotAPI(BotAPIParams{
+		Bot:     bot,
+		ChantID: tb.ChatID(opt.NotifierChatID),
 	})
 	if err != nil {
-		return err
-	}
-	notifier := &Notifier{
-		Store:  a.store,
-		BotAPI: a.bot,
-		Links: &LinksApi{
-			Lgr:    a.lgr,
-			Itunes: itunesAPI,
-			Odesli: odesliAPI,
-		},
-		Lgr: a.lgr,
+		return nil, fmt.Errorf("failed to create bot api: %w", err)
 	}
 
-	jobFun := func() {
-		if err := notifier.Notify(ctx); err != nil {
-			a.lgr.Logf("[ERROR] notifier %v", err)
-		}
-
-		_, next := a.scheduler.NextRun()
-		a.lgr.Logf("[INFO] job next start %s", next)
+	notifyRetryBot, err := NewRetryableBotApi(RetryableBotApiParams{
+		Lgr: lgr,
+		Bot: notifyBot,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create retryable bot: %w", err)
 	}
 
-	_, err = a.scheduler.Every(3).Hour().Do(jobFun)
-	return err
+	notifier, err := NewNotifier(NotifierParams{
+		Lgr:    lgr,
+		Store:  store,
+		BotAPI: notifyRetryBot,
+		Links:  links,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create notifier: %w", err)
+	}
+
+	job, err := scheduler.
+		Every(1).
+		Hour().
+		Do(func() {
+			go func() {
+				if nErr := notifier.Notify(ctx); nErr != nil {
+					lgr.Logf("[ERROR] notifier %v", nErr)
+				}
+			}()
+		})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create job: %w", err)
+	}
+
+	lgr.Logf("[INFO] job next start %s", job.NextRun())
+
+	return notifier, nil
 }
 
-func (a *App) runScrapers(ctx context.Context, opt *Options) error {
-	if err := runCoreRadio(ctx, a); err != nil {
-		return err
-	}
-
-	if err := runGetRockMusic(ctx, a, opt); err != nil {
-		return err
-	}
-
-	if err := runAlterPortal(ctx, a); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func runAlterPortal(ctx context.Context, a *App) error {
-	link, err := url.Parse(AlterPortalParserRssURL)
-	if err != nil {
-		return err
-	}
-
-	job := Job{
-		s: &Scraper{
-			parser: &Parser{
-				url:        AlterPortalParserRssURL,
-				feedParser: gofeed.NewParser(),
-				store:      a.store,
-				lgr:        a.lgr,
-				itemParser: &AlterPortalParser{
-					Lgr:    a.lgr,
-					Client: http.DefaultClient,
-				},
-				siteLabel: link.Host,
-			},
-			lgr:       a.lgr,
-			ch:        a.ch,
-			store:     a.store,
-			withDelay: false,
-			name:      "alterPortal",
-		},
-		sch:  a.scheduler,
-		name: "alterPortal",
-		lgr:  a.lgr,
-	}
-
-	_, err = a.scheduler.Every(15).Minutes().Do(job.Do, ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func runGetRockMusic(ctx context.Context, a *App, opt *Options) error {
-	dialer, err := newDialer(opt)
-	if err != nil {
-		return err
-	}
-
-	client, err := newClient(dialer, opt)
-	if err != nil {
-		return err
-	}
-
-	feedParser := gofeed.NewParser()
-	feedParser.Client = client
-
-	link, err := url.Parse(GetRockMusicParserRssURL)
-	if err != nil {
-		return err
-	}
-
-	job := Job{
-		s: &Scraper{
-			parser: &Parser{
-				url:        GetRockMusicParserRssURL,
-				feedParser: feedParser,
-				store:      a.store,
-				lgr:        a.lgr,
-				itemParser: &GetRockMusicParser{
-					Lgr:    a.lgr,
-					Client: client,
-				},
-				siteLabel: link.Host,
-				withDelay: false,
-			},
-			lgr:       a.lgr,
-			ch:        a.ch,
-			store:     a.store,
-			withDelay: false,
-			name:      "getRockMusic",
-		},
-		sch:  a.scheduler,
-		name: "getRockMusic",
-		lgr:  a.lgr,
-	}
-
-	_, err = a.scheduler.Every(35).Minutes().Do(job.Do, ctx)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func runCoreRadio(ctx context.Context, a *App) error {
+func runCoreRadio(
+	ctx context.Context,
+	lgr lgr.L,
+	store *Store,
+	httpClient *http.Client,
+	ch chan []News,
+	scheduler *gocron.Scheduler,
+) error {
 	link, err := url.Parse(CoreRadioParserRssURL)
 	if err != nil {
 		return err
 	}
-
-	job := Job{
-		s: &Scraper{
-			parser: &Parser{
-				url:        CoreRadioParserRssURL,
-				feedParser: gofeed.NewParser(),
-				store:      a.store,
-				lgr:        a.lgr,
-				itemParser: &CoreRadioParser{
-					Lgr:    a.lgr,
-					Client: http.DefaultClient,
-				},
-				siteLabel: link.Host,
+	s := &Scraper{
+		parser: &Parser{
+			url:        CoreRadioParserRssURL,
+			feedParser: gofeed.NewParser(),
+			store:      store,
+			lgr:        lgr,
+			itemParser: &CoreRadioParser{
+				Lgr:    lgr,
+				Client: httpClient,
 			},
-			lgr:       a.lgr,
-			ch:        a.ch,
-			store:     a.store,
+			siteLabel: link.Host,
 			withDelay: false,
-			name:      "coreRadio",
 		},
-		sch:  a.scheduler,
-		name: "coreRadio",
-		lgr:  a.lgr,
+		lgr:       lgr,
+		ch:        ch,
+		store:     store,
+		withDelay: false,
+		name:      "coreRadio",
 	}
-
-	_, err = a.scheduler.Every(20).Minutes().Do(job.Do, ctx)
+	job, err := scheduler.
+		Every(20).
+		Minutes().
+		Do(func() {
+			go func() {
+				sErr := s.Scrape(ctx)
+				if sErr != nil {
+					lgr.Logf("[ERROR] failed to scrape %s: %v", s.name, sErr)
+				}
+			}()
+		})
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create job: %w", err)
 	}
-
+	lgr.Logf("[INFO] created job: %s", job.NextRun())
 	return nil
 }
 
-func newDialer(opt *Options) (proxy.Dialer, error) {
-	defaultDialer := &net.Dialer{
-		Timeout:   30 * time.Second,
-		KeepAlive: 30 * time.Second,
-	}
-
-	if ProxyType(opt.ProxyType) == ProxyTypeSocks5 {
-		dialer, err := proxy.SOCKS5("tcp", opt.ProxyURL, &proxy.Auth{
-			User:     opt.User,
-			Password: opt.Passwd,
-		}, defaultDialer)
-		if err != nil {
-			return nil, err
-		}
-
-		return dialer, nil
-	}
-
-	return defaultDialer, nil
-}
-
-func newClient(dialer proxy.Dialer, opt *Options) (*http.Client, error) {
-	httpProxy := http.ProxyFromEnvironment
-
-	if ProxyType(opt.ProxyType) == ProxyTypeHttp {
-		proxyURL, err := url.Parse(opt.ProxyURL)
-		if err != nil {
-			return nil, err
-		}
-
-		httpProxy = http.ProxyURL(proxyURL)
-	}
-
-	return &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			Proxy: httpProxy,
-			DialContext: func(ctx context.Context, network, addr string) (conn net.Conn, err error) {
-				return dialer.Dial(network, addr)
-			},
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       90 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-		},
-	}, nil
-}
-
-func processUnpublished(ctx context.Context, app *App, lgr lgr.L) {
-	items, err := app.store.GetUnpublished(ctx)
+func runGetRockMusic(
+	ctx context.Context,
+	lgr lgr.L,
+	store *Store,
+	httpClient *http.Client,
+	ch chan []News,
+	scheduler *gocron.Scheduler,
+) error {
+	link, err := url.Parse(GetRockMusicParserRssURL)
 	if err != nil {
-		lgr.Logf("[ERROR] GetUnpublished: %v", err)
-	} else {
-		arr := make([]News, 0, len(items))
-		for _, v := range items {
-			arr = append(arr, v)
-		}
-		app.ch <- arr
+		return err
 	}
+	parser := gofeed.NewParser()
+	parser.Client = httpClient
+	s := &Scraper{
+		parser: &Parser{
+			url:        GetRockMusicParserRssURL,
+			feedParser: parser,
+			store:      store,
+			lgr:        lgr,
+			itemParser: &GetRockMusicParser{
+				Lgr:    lgr,
+				Client: httpClient,
+			},
+			siteLabel: link.Host,
+			withDelay: false,
+		},
+		lgr:       lgr,
+		ch:        ch,
+		store:     store,
+		withDelay: false,
+		name:      "getRockMusic",
+	}
+	job, err := scheduler.
+		Every(22).
+		Minutes().
+		Do(func() {
+			go func() {
+				sErr := s.Scrape(ctx)
+				if sErr != nil {
+					lgr.Logf("[ERROR] failed to scrape %s: %v", s.name, sErr)
+				}
+			}()
+		})
+	if err != nil {
+		return fmt.Errorf("failed to create job: %w", err)
+	}
+	lgr.Logf("[INFO] created job: %s", job.NextRun())
+	return nil
+}
+
+func runAlterPortal(
+	ctx context.Context,
+	lgr lgr.L,
+	store *Store,
+	httpClient *http.Client,
+	ch chan []News,
+	scheduler *gocron.Scheduler,
+) error {
+	link, err := url.Parse(AlterPortalParserRssURL)
+	if err != nil {
+		return err
+	}
+	parser := gofeed.NewParser()
+	parser.Client = httpClient
+	s := &Scraper{
+		parser: &Parser{
+			url:        AlterPortalParserRssURL,
+			feedParser: parser,
+			store:      store,
+			lgr:        lgr,
+			itemParser: &GetRockMusicParser{
+				Lgr:    lgr,
+				Client: httpClient,
+			},
+			siteLabel: link.Host,
+			withDelay: false,
+		},
+		lgr:       lgr,
+		ch:        ch,
+		store:     store,
+		withDelay: false,
+		name:      "alterPortal",
+	}
+	job, err := scheduler.
+		Every(25).
+		Minutes().
+		Do(func() {
+			go func() {
+				sErr := s.Scrape(ctx)
+				if sErr != nil {
+					lgr.Logf("[ERROR] failed to scrape %s: %v", s.name, sErr)
+				}
+			}()
+		})
+	if err != nil {
+		return fmt.Errorf("failed to create job: %w", err)
+	}
+	lgr.Logf("[INFO] created job: %s", job.NextRun())
+	return nil
+}
+
+func createPublisher(
+	ctx context.Context,
+	lgr lgr.L,
+	store *Store,
+	bot *tb.Bot,
+	opt *Options,
+	ch chan []News,
+) (*Publisher, error) {
+	notifyBot, err := NewBotAPI(BotAPIParams{
+		Bot:     bot,
+		ChantID: tb.ChatID(opt.NewsChatID),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create bot api: %w", err)
+	}
+
+	notifyRetryBot, err := NewRetryableBotApi(RetryableBotApiParams{
+		Lgr: lgr,
+		Bot: notifyBot,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create retryable bot api: %w", err)
+	}
+
+	publisher, err := NewPublisher(PublisherParams{
+		Lgr:    lgr,
+		NewsCh: ch,
+		BotAPI: notifyRetryBot,
+		Store:  store,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create publisher: %w", err)
+	}
+
+	go func() {
+		sErr := publisher.Start(ctx)
+		if sErr != nil {
+			lgr.Logf("[ERROR] failed to start publisher: %v", sErr)
+		}
+	}()
+
+	return publisher, nil
 }

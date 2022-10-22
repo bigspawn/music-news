@@ -12,9 +12,33 @@ import (
 	tb "gopkg.in/telebot.v3"
 )
 
-type RetryableBotApi struct {
-	Bot BotAPI
+type RetryableBotApiParams struct {
 	Lgr lgr.L
+	Bot *BotAPI
+}
+
+func (p *RetryableBotApiParams) Validate() error {
+	if p.Lgr == nil {
+		return errors.New("lgr is required")
+	}
+
+	if p.Bot == nil {
+		return errors.New("bot is required")
+	}
+	return nil
+}
+
+type RetryableBotApi struct {
+	RetryableBotApiParams
+}
+
+func NewRetryableBotApi(params RetryableBotApiParams) (*RetryableBotApi, error) {
+	if err := params.Validate(); err != nil {
+		return nil, err
+	}
+	return &RetryableBotApi{
+		RetryableBotApiParams: params,
+	}, nil
 }
 
 func (api RetryableBotApi) SendNews(ctx context.Context, n News) error {
@@ -81,9 +105,32 @@ func (api RetryableBotApi) retry(ctx context.Context, info interface{}, err erro
 	return nil
 }
 
-type BotAPI struct {
+type BotAPIParams struct {
 	Bot     *tb.Bot
 	ChantID tb.ChatID
+}
+
+func (p *BotAPIParams) Validate() error {
+	if p.Bot == nil {
+		return errors.New("bot is required")
+	}
+	if p.ChantID == 0 {
+		return errors.New("chant_id is required")
+	}
+	return nil
+}
+
+type BotAPI struct {
+	BotAPIParams
+}
+
+func NewBotAPI(params BotAPIParams) (*BotAPI, error) {
+	if err := params.Validate(); err != nil {
+		return nil, err
+	}
+	return &BotAPI{
+		BotAPIParams: params,
+	}, nil
 }
 
 func (api *BotAPI) SendNews(ctx context.Context, n News) (int, error) {
