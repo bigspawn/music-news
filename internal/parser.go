@@ -3,7 +3,6 @@ package internal
 import (
 	"context"
 	"errors"
-	"math/rand"
 	"time"
 
 	"github.com/go-pkgz/lgr"
@@ -99,9 +98,4 @@ func (p *Parser) Parse(ctx context.Context) ([]News, error) {
 	}
 
 	return news, nil
-}
-
-func RandBetween(max int, min int) int {
-	//nolint:gosec // no crypto
-	return rand.Intn(max-min+1) + min
 }
