@@ -152,21 +152,20 @@ func createNotifier(
 		return nil, fmt.Errorf("failed to create notifier: %w", err)
 	}
 
-	job, err := scheduler.
+	_, err = scheduler.
 		Every(1).
 		Hour().
-		Do(func() {
+		DoWithJobDetails(func(job gocron.Job) {
 			go func() {
 				if nErr := notifier.Notify(ctx); nErr != nil {
 					lgr.Logf("[ERROR] notifier %v", nErr)
 				}
+				lgr.Logf("[INFO] notifier done, next run %v", job.NextRun())
 			}()
 		})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create job: %w", err)
 	}
-
-	lgr.Logf("[INFO] job next start %s", job.NextRun())
 
 	return notifier, nil
 }
@@ -202,21 +201,21 @@ func runCoreRadio(
 		withDelay: false,
 		name:      "coreRadio",
 	}
-	job, err := scheduler.
+	_, err = scheduler.
 		Every(16).
 		Minutes().
-		Do(func() {
+		DoWithJobDetails(func(job gocron.Job) {
 			go func() {
 				sErr := s.Scrape(ctx)
 				if sErr != nil {
 					lgr.Logf("[ERROR] failed to scrape %s: %v", s.name, sErr)
 				}
+				lgr.Logf("[INFO] CoreRadioParser done, next run %v", job.NextRun())
 			}()
 		})
 	if err != nil {
 		return fmt.Errorf("failed to create job: %w", err)
 	}
-	lgr.Logf("[INFO] created job: %s", job.NextRun())
 	return nil
 }
 
@@ -253,21 +252,21 @@ func runGetRockMusic(
 		withDelay: false,
 		name:      "getRockMusic",
 	}
-	job, err := scheduler.
+	_, err = scheduler.
 		Every(17).
 		Minutes().
-		Do(func() {
+		DoWithJobDetails(func(job gocron.Job) {
 			go func() {
 				sErr := s.Scrape(ctx)
 				if sErr != nil {
 					lgr.Logf("[ERROR] failed to scrape %s: %v", s.name, sErr)
 				}
+				lgr.Logf("[INFO] GetRockMusicParser done, next run %v", job.NextRun())
 			}()
 		})
 	if err != nil {
 		return fmt.Errorf("failed to create job: %w", err)
 	}
-	lgr.Logf("[INFO] created job: %s", job.NextRun())
 	return nil
 }
 
@@ -304,21 +303,24 @@ func runAlterPortal(
 		withDelay: false,
 		name:      "alterPortal",
 	}
-	job, err := scheduler.
+	_, err = scheduler.
 		Every(15).
 		Minutes().
-		Do(func() {
+		DoWithJobDetails(func(job gocron.Job) {
 			go func() {
 				sErr := s.Scrape(ctx)
 				if sErr != nil {
 					lgr.Logf("[ERROR] failed to scrape %s: %v", s.name, sErr)
 				}
+				lgr.Logf("[INFO] AlterPortalParser done, next run %v", job.NextRun())
 			}()
 		})
 	if err != nil {
 		return fmt.Errorf("failed to create job: %w", err)
 	}
-	lgr.Logf("[INFO] created job: %s", job.NextRun())
+	if err != nil {
+		return fmt.Errorf("failed to create job: %w", err)
+	}
 	return nil
 }
 

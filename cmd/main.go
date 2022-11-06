@@ -32,8 +32,6 @@ func main() {
 		logger.Logf("[FATAL] parse flags err=%v", err)
 	}
 
-	logger.Logf("[INFO] start with options=%+v", opt)
-
 	go internal.StartHandlers(logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
