@@ -24,6 +24,7 @@ var fileHosts = []string{
 	"coreradio.ru",
 	alterportalHost,
 	getrockmusicHost,
+	"turb.pw",
 }
 
 func isAllowedFileHost(host string) bool {

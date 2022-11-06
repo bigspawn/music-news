@@ -203,7 +203,7 @@ func runCoreRadio(
 		name:      "coreRadio",
 	}
 	job, err := scheduler.
-		Every(20).
+		Every(16).
 		Minutes().
 		Do(func() {
 			go func() {
@@ -254,7 +254,7 @@ func runGetRockMusic(
 		name:      "getRockMusic",
 	}
 	job, err := scheduler.
-		Every(22).
+		Every(17).
 		Minutes().
 		Do(func() {
 			go func() {
@@ -291,7 +291,7 @@ func runAlterPortal(
 			feedParser: parser,
 			store:      store,
 			lgr:        lgr,
-			itemParser: &GetRockMusicParser{
+			itemParser: &AlterPortalParser{
 				Lgr:    lgr,
 				Client: httpClient,
 			},
@@ -305,7 +305,7 @@ func runAlterPortal(
 		name:      "alterPortal",
 	}
 	job, err := scheduler.
-		Every(25).
+		Every(15).
 		Minutes().
 		Do(func() {
 			go func() {
