@@ -11,6 +11,7 @@ var requiredPlatforms = []goOdesli.Platform{
 	goOdesli.PlatformSpotify,
 	goOdesli.PlatformItunes,
 	goOdesli.PlatformYandex,
+	goOdesli.PlatformDeezer,
 }
 
 func CheckRequiredPlatforms(platforms map[goOdesli.Platform]string) (map[goOdesli.Platform]string, error) {
