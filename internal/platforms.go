@@ -21,7 +21,7 @@ func CheckRequiredPlatforms(platforms map[goOdesli.Platform]string) (map[goOdesl
 			result[platform] = link
 			continue
 		}
-		if platform == goOdesli.PlatformTidal || platform == goOdesli.PlatformSpotify || platform == goOdesli.PlatformItunes {
+		if platform == goOdesli.PlatformSpotify || platform == goOdesli.PlatformItunes {
 			return nil, fmt.Errorf("link for platform=%s not found", platform)
 		}
 	}
