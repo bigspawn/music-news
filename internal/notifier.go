@@ -2,10 +2,11 @@ package internal
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"time"
 
 	"github.com/go-pkgz/lgr"
-	"github.com/pkg/errors"
 )
 
 type NotifierParams struct {
@@ -75,12 +76,12 @@ func (n *Notifier) Notify(ctx context.Context) error {
 func (n *Notifier) notify(ctx context.Context, item News) error {
 	releaseLink, linksByPlatform, err := n.Links.GetLinks(ctx, item.Title)
 	if err != nil {
-		return errors.Wrap(err, "get platform links")
+		return fmt.Errorf("get links: %w", err)
 	}
 
 	links, err := CheckRequiredPlatforms(linksByPlatform)
 	if err != nil {
-		return errors.Wrap(err, "validate platform links")
+		return fmt.Errorf("check required platforms: %w", err)
 	}
 
 	err = n.BotAPI.SendReleaseNews(ctx, ReleaseNews{
@@ -89,11 +90,11 @@ func (n *Notifier) notify(ctx context.Context, item News) error {
 		PlatformLinks: links,
 	})
 	if err != nil {
-		return errors.Wrap(err, "send notify")
+		return fmt.Errorf("send release news: %w", err)
 	}
 
 	if err := n.Store.UpdateNotifyFlag(ctx, item); err != nil {
-		return errors.Wrap(err, "update store notify")
+		return fmt.Errorf("update notify flag: %w", err)
 	}
 
 	return nil

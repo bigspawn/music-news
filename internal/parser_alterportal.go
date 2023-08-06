@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -12,7 +13,6 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/go-pkgz/lgr"
 	"github.com/mmcdole/gofeed"
-	"github.com/pkg/errors"
 	"golang.org/x/net/html"
 )
 

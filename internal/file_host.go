@@ -26,6 +26,7 @@ var fileHosts = []string{
 	getrockmusicHost,
 	"turb.pw",
 	"krakenfiles.com",
+	"trbbt.net",
 }
 
 func isAllowedFileHost(host string) bool {

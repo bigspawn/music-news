@@ -10,7 +10,6 @@ var status uint32
 
 func getStatus(l lgr.L) uint32 {
 	val := atomic.LoadUint32(&status)
-	l.Logf("[INFO] get app status %d", val)
 	return val
 }
 

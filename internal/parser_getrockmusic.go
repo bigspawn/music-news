@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -9,7 +10,6 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/go-pkgz/lgr"
 	"github.com/mmcdole/gofeed"
-	"github.com/pkg/errors"
 )
 
 const (
