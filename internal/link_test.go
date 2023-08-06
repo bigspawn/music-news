@@ -1,7 +1,12 @@
 package internal
 
 import (
+	"context"
+	"fmt"
 	"testing"
+
+	itunes "github.com/bigspawn/go-itunes-api"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_clearTitle(t *testing.T) {
@@ -68,6 +73,7 @@ func Test_clearTitle(t *testing.T) {
 		{title: "Omniarch - Omniarch (2020)", want: "Omniarch - Omniarch"},
 		{title: "Foad - Returner (2020)", want: "Foad - Returner"},
 		{title: "Trees Will Tell - Negative Results (2020)", want: "Trees Will Tell - Negative Results"},
+		{title: "Agriculture - Agriculture (2023)", want: "Agriculture - Agriculture"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.title, func(t *testing.T) {
@@ -76,4 +82,17 @@ func Test_clearTitle(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestName(t *testing.T) {
+	t.Skip()
+
+	api, err := itunes.NewClient(itunes.ClientOption{})
+	require.NoError(t, err)
+	resp, err := api.Search(context.Background(), itunes.SearchRequest{
+		Term:    "Agriculture - Agriculture",
+		Country: itunes.US,
+	})
+	require.NoError(t, err)
+	fmt.Println(resp)
 }
