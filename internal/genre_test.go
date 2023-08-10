@@ -16,16 +16,23 @@ func Test_isSkippedGender(t *testing.T) {
 		want bool
 	}{
 		{
-			name: "skip it",
+			name: "skip gender",
 			args: args{
-				data: skipGenders[0],
+				data: "Genre: Gothabilly",
 			},
 			want: true,
 		},
 		{
-			name: "skip it long",
+			name: "skip gender without space",
 			args: args{
-				data: "slakajfsasf" + skipGenders[0] + "sdgadsgsdg",
+				data: "Genre:Gothabilly",
+			},
+			want: true,
+		},
+		{
+			name: "skip gender in the middle",
+			args: args{
+				data: "Genre: slakajfsasf" + "Gothabilly" + "sdgadsgsdg",
 			},
 			want: true,
 		},
@@ -39,8 +46,8 @@ func Test_isSkippedGender(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isSkippedGender(lgr.Default(), tt.args.data); got != tt.want {
-				t.Errorf("isSkippedGender() = %v, want %v", got, tt.want)
+			if got := isSkippedGenre(lgr.Default(), tt.args.data); got != tt.want {
+				t.Errorf("isSkippedGenre() = %v, want %v", got, tt.want)
 			}
 		})
 	}

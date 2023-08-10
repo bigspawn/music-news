@@ -95,7 +95,7 @@ func (p *CoreRadioParser) Parse(ctx context.Context, item *gofeed.Item) (*News, 
 		news.Text = news.Text[:last]
 	}
 
-	if isSkippedGender(p.Lgr, news.Text) {
+	if isSkippedGenre(p.Lgr, news.Text) {
 		return nil, ErrSkipItem
 	}
 

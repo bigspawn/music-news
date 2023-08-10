@@ -77,7 +77,7 @@ func (p *GetRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*New
 	}
 	news.Text = strings.TrimSpace(builder.String())
 
-	if isSkippedGender(p.Lgr, news.Text) {
+	if isSkippedGenre(p.Lgr, news.Text) {
 		return nil, ErrSkipItem
 	}
 

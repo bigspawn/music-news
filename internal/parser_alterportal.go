@@ -140,7 +140,7 @@ func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 	}
 	news.Text = builder.String()
 
-	if isSkippedGender(p.Lgr, news.Text) {
+	if isSkippedGenre(p.Lgr, news.Text) {
 		return nil, ErrSkipItem
 	}
 
