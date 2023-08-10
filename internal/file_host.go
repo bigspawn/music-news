@@ -27,6 +27,9 @@ var fileHosts = []string{
 	"turb.pw",
 	"krakenfiles.com",
 	"trbbt.net",
+	"drive.google.com",
+	"megaup.net",
+	"1fichier.com",
 }
 
 func isAllowedFileHost(host string) bool {

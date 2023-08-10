@@ -17,10 +17,11 @@ import (
 )
 
 type App struct {
-	lgr       lgr.L
-	store     *Store
-	scheduler *gocron.Scheduler
-	ch        chan []News
+	lgr           lgr.L
+	store         *Store
+	scheduler     *gocron.Scheduler
+	ch            chan []News
+	reNotifiedJob *ReNotifiedJob
 }
 
 func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
@@ -97,20 +98,29 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 		return nil, fmt.Errorf("failed to create publisher: %w", err)
 	}
 
+	reNotifiedJob := NewReNotifiedJob(ReNotifiedJobParams{
+		lgr:   lgr,
+		store: store,
+		ch:    ch,
+	})
+
 	return &App{
-		lgr:       lgr,
-		store:     store,
-		scheduler: scheduler,
-		ch:        ch,
+		lgr:           lgr,
+		store:         store,
+		scheduler:     scheduler,
+		ch:            ch,
+		reNotifiedJob: reNotifiedJob,
 	}, nil
 }
 
-func (a *App) Start(_ context.Context) error {
+func (a *App) Start(ctx context.Context) error {
 	go a.scheduler.StartAsync()
+	go a.reNotifiedJob.Run(ctx)
 	return nil
 }
 
 func (a *App) Stop() {
+	a.reNotifiedJob.Stop()
 	a.scheduler.Stop()
 	a.scheduler.Clear()
 	a.store.Stop()

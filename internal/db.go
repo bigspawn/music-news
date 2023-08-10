@@ -12,45 +12,45 @@ import (
 
 const (
 	driver      = "sqlite3"
-	insertQuery = `			INSERT INTO main.news(title, playlist, date_time, imageurl, downloadurl, pageurl, posted, created_at) 
-							VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`
+	insertQuery = `			insert into main.news(title, playlist, date_time, imageurl, downloadurl, pageurl, posted, created_at) 
+							values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`
 
-	selectNotified = `		SELECT id, title, playlist, imageurl, date_time, downloadurl
-							FROM main.news
-							WHERE not notified
-							  AND title NOT LIKE '%Single%'
-							  AND title NOT LIKE '%single%'
-							  AND created_at > strftime('%Y-%m-%d %H:%M:%S+00:00', 'now', 'utc', '-1 months')
-							ORDER BY date_time`
+	selectNotified = `		select id, title, playlist, imageurl, date_time, downloadurl
+							from main.news
+							where not notified
+							  and title not like '%Single%'
+							  and title not like '%single%'
+							  and created_at > strftime('%Y-%m-%d %H:%M:%S+00:00', 'now', 'utc', '-1 months')
+							order by date_time`
 
-	updateNotified = `		UPDATE main.news 
-							SET notified = true 
-							WHERE id = $1`
+	updateNotified = `		update main.news 
+							set notified = true 
+							where id = $1`
 
-	selectUnpublished = `	SELECT id, title, playlist, imageurl, date_time, downloadurl, pageurl
-							FROM main.news
-							WHERE posted = false
-							  AND created_at > strftime('%Y-%m-%d %H:%M:%S+00:00', 'now', 'utc', '-1 months')
-							ORDER BY created_at`
+	selectUnpublished = `	select id, title, playlist, imageurl, date_time, downloadurl, pageurl
+							from main.news
+							where posted = false
+							  and created_at > strftime('%Y-%m-%d %H:%M:%S+00:00', 'now', 'utc', '-1 months')
+							order by created_at`
 
-	updatePosted = `		UPDATE main.news 
-							SET posted = true 
-							WHERE title = $1`
+	updatePosted = `		update main.news 
+							set posted = true 
+							where title = $1`
 
-	selectExists = `		SELECT * 
-							FROM main.news 
-							WHERE title LIKE '%' || $1 || '%'`
+	selectExists = `		select * 
+							from main.news 
+							where title like '%' || $1 || '%'`
 
-	selectAll = `			SELECT id, title, date_time, downloadurl, imageurl, playlist, posted, notified, created_at
-							FROM main.news`
+	selectAll = `			select id, title, date_time, downloadurl, imageurl, playlist, posted, notified, created_at
+							from main.news`
 
-	updatePostedByID = `	UPDATE main.news 
-							SET posted = true 
-							WHERE id = $1`
+	updatePostedByID = `	update main.news 
+							set posted = true 
+							where id = $1`
 
-	updatePostedAndNotifiedByID = `	UPDATE main.news 
-									SET posted = true, notified = true 
-									WHERE id = $1`
+	updatePostedAndNotifiedByID = `	update main.news 
+									set posted = true, notified = true 
+									where id = $1`
 )
 
 // News is an article structure.
@@ -163,7 +163,7 @@ func (s *Store) UpdateNotifyFlag(ctx context.Context, item News) error {
 	return s.exec(ctx, updateNotified, item.ID)
 }
 
-func (s *Store) GetUnpublished(ctx context.Context) (map[string]News, error) {
+func (s *Store) GetUnpublished(ctx context.Context) ([]News, error) {
 	rows, err := s.DB.QueryContext(ctx, selectUnpublished)
 	if err != nil {
 		return nil, err
@@ -178,7 +178,7 @@ func (s *Store) GetUnpublished(ctx context.Context) (map[string]News, error) {
 		PageLink     = new(string)
 		DownloadLink = new(string)
 		DateTime     = new(time.Time)
-		unpublished  = make(map[string]News)
+		unpublished  = make([]News, 0, 32)
 	)
 	for rows.Next() {
 		if err := rows.Scan(ID, Title, Text, ImageLink, DateTime, DownloadLink, PageLink); err != nil {
@@ -193,7 +193,7 @@ func (s *Store) GetUnpublished(ctx context.Context) (map[string]News, error) {
 			DateTime:     *DateTime,
 			PageLink:     *PageLink,
 		}
-		unpublished[n.Title] = n
+		unpublished = append(unpublished, n)
 	}
 	return unpublished, nil
 }
