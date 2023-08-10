@@ -95,10 +95,6 @@ func (p *CoreRadioParser) Parse(ctx context.Context, item *gofeed.Item) (*News, 
 		news.Text = news.Text[:last]
 	}
 
-	if isSkippedGenre(p.Lgr, news.Text) {
-		return nil, ErrSkipItem
-	}
-
 	news.Text = moreThan2NewLinesRegexp.ReplaceAllString(news.Text, "\n")
 
 	b = &strings.Builder{}
@@ -109,6 +105,10 @@ func (p *CoreRadioParser) Parse(ctx context.Context, item *gofeed.Item) (*News, 
 		}
 	}
 	news.Text = strings.TrimSpace(b.String())
+
+	if isSkippedGenre(p.Lgr, news.Text) {
+		return nil, ErrSkipItem
+	}
 
 	return news, nil
 }

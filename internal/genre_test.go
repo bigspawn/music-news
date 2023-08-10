@@ -23,6 +23,13 @@ func Test_isSkippedGender(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "skip gender",
+			args: args{
+				data: "Genre: Hillbilly / Rockabilly ",
+			},
+			want: true,
+		},
+		{
 			name: "skip gender without space",
 			args: args{
 				data: "Genre:Gothabilly",

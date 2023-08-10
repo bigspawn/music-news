@@ -139,17 +139,16 @@ func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 		findText(node, builder)
 	}
 	news.Text = builder.String()
-
-	if isSkippedGenre(p.Lgr, news.Text) {
-		return nil, ErrSkipItem
-	}
-
 	news.Text = translate(news.Text)
 	news.Text = moreThan2NewLinesRegexp.ReplaceAllString(news.Text, "\n")
 	news.Text = strings.ReplaceAll(news.Text, "[ ] \n", "")
 	news.Text = strings.ReplaceAll(news.Text, ":: ", "")
 	news.Text = trimLast(news.Text)
 	news.Text = strings.TrimSpace(news.Text)
+
+	if isSkippedGenre(p.Lgr, news.Text) {
+		return nil, ErrSkipItem
+	}
 
 	return news, nil
 }

@@ -76,15 +76,13 @@ func (p *GetRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*New
 		findText(node, builder)
 	}
 	news.Text = strings.TrimSpace(builder.String())
+	news.Text = moreThan2NewLinesRegexp.ReplaceAllString(news.Text, "\n")
+	news.Text = trimLast(news.Text)
+	news.Text = news.Text[strings.Index(news.Text, "\n")+1:]
 
 	if isSkippedGenre(p.Lgr, news.Text) {
 		return nil, ErrSkipItem
 	}
-
-	news.Text = moreThan2NewLinesRegexp.ReplaceAllString(news.Text, "\n")
-	news.Text = trimLast(news.Text)
-
-	news.Text = news.Text[strings.Index(news.Text, "\n")+1:]
 
 	return news, nil
 }
