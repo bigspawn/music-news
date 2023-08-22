@@ -30,6 +30,7 @@ var fileHosts = []string{
 	"drive.google.com",
 	"megaup.net",
 	"1fichier.com",
+	"cloud.mail.ru",
 }
 
 func isAllowedFileHost(host string) bool {

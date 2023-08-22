@@ -50,6 +50,13 @@ func Test_isSkippedGender(t *testing.T) {
 			},
 			want: false,
 		},
+		{
+			name: "skip",
+			args: args{
+				data: "Album: Stroke in Time \nGenre: Blues Rock / Country Rock \nCountry: USA \nReleased: 2023 \nQuality: MP3 320 / FLAC \nTracklist: \n01. Leave It to Chance \n02. Shiny Globe \n03. Sweet Spot \n04. Lady and Lasalle \n05. Blind Men \n06. Sweeping (Out) the Corners \n07. Backyard Burning \n08. Someone Else's War \n",
+			},
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
