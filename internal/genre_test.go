@@ -51,11 +51,32 @@ func Test_isSkippedGender(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "skip",
+			name: "skip one line with new line",
 			args: args{
 				data: "Album: Stroke in Time \nGenre: Blues Rock / Country Rock \nCountry: USA \nReleased: 2023 \nQuality: MP3 320 / FLAC \nTracklist: \n01. Leave It to Chance \n02. Shiny Globe \n03. Sweet Spot \n04. Lady and Lasalle \n05. Blind Men \n06. Sweeping (Out) the Corners \n07. Backyard Burning \n08. Someone Else's War \n",
 			},
-			want: false,
+			want: true,
+		},
+		{
+			name: "skip new line",
+			args: args{
+				data: `Album: Stroke in Time 
+Genre: Blues Rock / Country Rock 
+Country: USA 
+Released: 2023 
+Quality: MP3 320 / FLAC 
+Tracklist: 
+01. Leave It to Chance 
+02. Shiny Globe 
+03. Sweet Spot 
+04. Lady and Lasalle 
+05. Blind Men 
+06. Sweeping (Out) the Corners 
+07. Backyard Burning 
+08. Someone Else's War 
+`,
+			},
+			want: true,
 		},
 	}
 	for _, tt := range tests {

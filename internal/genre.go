@@ -10,7 +10,6 @@ import (
 
 var genres = []string{
 	`Blues Rock`,
-	`Blues Rock`,
 	`Celtic Punk`,
 	`City Pop`,
 	`Cow Punk`,
@@ -39,7 +38,7 @@ var genres = []string{
 	`Street Punk`,
 }
 
-var genreRegexpStr = fmt.Sprintf(`Genre:.*(%s).*\n`, strings.Join(genres, "|"))
+var genreRegexpStr = fmt.Sprintf(`Genre:.*(%s).*`, strings.Join(genres, "|"))
 
 var genreToSkip = regexp.MustCompile(genreRegexpStr)
 
