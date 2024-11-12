@@ -38,7 +38,7 @@ func (s *Scraper) Scrape(ctx context.Context) error {
 
 	items, err := s.parser.Parse(ctx)
 	if err != nil {
-		s.lgr.Logf("[ERROR] can't parse: err=%v", err)
+		s.lgr.Logf("[ERROR] can't parse: site:%s, err=%v", s.parser.siteLabel, err)
 
 		if netErr(err) || strings.Contains(err.Error(), "network is unreachable") {
 			return err
@@ -79,7 +79,7 @@ func (s *Scraper) wait(ctx context.Context) error {
 	return nil
 }
 
-//nolint: errorlint // ok
+// nolint: errorlint // ok
 func netErr(err error) bool {
 	if ok := errors.Is(err, &net.DNSError{}); ok {
 		return ok

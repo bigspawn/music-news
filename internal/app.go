@@ -35,7 +35,10 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 		return nil, fmt.Errorf("failed to create itunes api client: %w", err)
 	}
 
-	odesliAPI, err := odesli.NewClient(odesli.ClientOption{APIToken: opt.SongApiKey})
+	odesliAPI, err := odesli.NewClient(odesli.ClientOption{
+		APIToken: opt.SongApiKey,
+		Debug:    false,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create odesli api client: %w", err)
 	}
