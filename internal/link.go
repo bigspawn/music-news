@@ -53,12 +53,12 @@ func NewLinksApi(params LinksApiParams) (*LinksApi, error) {
 func (api *LinksApi) GetLinks(ctx context.Context, title string) (string, map[odesli.Platform]string, error) {
 	id, err := api.getIDiTunes(ctx, clearTitle(title))
 	if err != nil {
-		return "", nil, err
+		return "", nil, fmt.Errorf("get itunes id for %s: %w", title, err)
 	}
 
 	resp, err := api.GetSongLink(ctx, id)
 	if err != nil {
-		return "", nil, err
+		return "", nil, fmt.Errorf("failed to get links for %s: %w", title, err)
 	}
 
 	links := make(map[odesli.Platform]string, len(resp.LinksByPlatform))
