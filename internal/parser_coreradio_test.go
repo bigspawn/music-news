@@ -1,7 +1,9 @@
 package internal
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
 	"net/http"
 	"os"
 	"testing"
@@ -126,4 +128,14 @@ func TestExtractAfterDecode(t *testing.T) {
 			}
 		})
 	}
+}
+
+//go:embed testdata/core_radio.html
+var data []byte
+
+func TestParseHtml(t *testing.T) {
+	n, err := ParseHtml(context.Background(), lgr.NoOp, &News{}, bytes.NewReader(data))
+	require.NoError(t, err)
+
+	t.Logf("%v\n", n)
 }

@@ -5,36 +5,37 @@ import "strings"
 const (
 	alterportalHost  = "alterportal.net"
 	getrockmusicHost = "getrockmusic.net"
+	coreradioHost    = "coreradio.online"
 )
 
-var fileHosts = []string{
-	"mediafire.com",
-	"zippyshare.com",
-	"mega.nz",
-	"solidfiles.com",
-	"drive.google.com",
-	"files.mail.ru",
-	"disk.yandex.ru",
-	"yadi.sk",
-	"files.fm",
-	"uppit.com",
-	"filecrypt.cc",
-	"turb.cc",
-	"turbobit.net",
-	"coreradio.ru",
-	alterportalHost,
-	getrockmusicHost,
-	"turb.pw",
-	"krakenfiles.com",
-	"trbbt.net",
-	"drive.google.com",
-	"megaup.net",
-	"1fichier.com",
-	"cloud.mail.ru",
+var fileHosts = map[string]struct{}{
+	"1fichier.com":     {},
+	"cloud.mail.ru":    {},
+	"coreradio.ru":     {},
+	"disk.yandex.ru":   {},
+	"drive.google.com": {},
+	"filecrypt.cc":     {},
+	"files.fm":         {},
+	"files.mail.ru":    {},
+	"krakenfiles.com":  {},
+	"mediafire.com":    {},
+	"mega.nz":          {},
+	"megaup.net":       {},
+	"solidfiles.com":   {},
+	"trbbt.net":        {},
+	"turb.cc":          {},
+	"turb.pw":          {},
+	"turbobit.net":     {},
+	"uppit.com":        {},
+	"yadi.sk":          {},
+	"zippyshare.com":   {},
+	alterportalHost:    {},
+	coreradioHost:      {},
+	getrockmusicHost:   {},
 }
 
 func isAllowedFileHost(host string) bool {
-	for _, s := range fileHosts {
+	for s, _ := range fileHosts {
 		if strings.Contains(host, s) {
 			return true
 		}
