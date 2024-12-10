@@ -331,9 +331,6 @@ func runAlterPortal(
 	if err != nil {
 		return fmt.Errorf("failed to create job: %w", err)
 	}
-	if err != nil {
-		return fmt.Errorf("failed to create job: %w", err)
-	}
 	return nil
 }
 

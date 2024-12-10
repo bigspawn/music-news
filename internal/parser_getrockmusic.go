@@ -23,7 +23,10 @@ type GetRockMusicParser struct {
 }
 
 func (p *GetRockMusicParser) Parse(ctx context.Context, item *gofeed.Item) (*News, error) {
-	news := NewNewsFromItem(item)
+	news, err := NewNewsFromItem(item)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create news from item: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, item.Link, nil)
 	if err != nil {

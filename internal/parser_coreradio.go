@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -13,7 +15,7 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
-const CoreRadioParserRssURL = "https://coreradio.ru/rss.xml"
+const CoreRadioParserRssURL = "https://coreradio.online/rss.xml"
 
 type CoreRadioParser struct {
 	Client *http.Client
@@ -31,48 +33,87 @@ func (p *CoreRadioParser) Parse(ctx context.Context, item *gofeed.Item) (*News, 
 		return nil, fmt.Errorf("coreradio: response is not 200 OK: status=%s, link=%s", resp.Status, item.Link)
 	}
 
-	news := NewNewsFromItem(item)
+	news, err := NewNewsFromItem(item)
+	if err != nil {
+		return nil, fmt.Errorf("coreradio: failed to create news from item: %w", err)
+	}
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	return ParseHtml(ctx, p.Lgr, news, resp.Body)
+}
+
+func ParseHtml(ctx context.Context, l lgr.L, news *News, r io.Reader) (*News, error) {
+	doc, err := goquery.NewDocumentFromReader(r)
 	if err != nil {
 		return nil, fmt.Errorf("coreradio: NewDocumentFromReader: %w", err)
 	}
 
 	// image link
-	var ok bool
-	news.ImageLink, ok = doc.
+	imageLink, ok := doc.
 		Find("#dle-content > div.full-news > div.full-news-top > div.full-news-left > center > a > img").
 		Attr("src")
-	if !ok {
-		itemDoc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(item.Description))
+	if ok {
+		il, err := url.Parse(imageLink)
 		if err != nil {
-			return nil, fmt.Errorf("coreradio: NewDocumentFromReader: Description: %w", err)
+			return nil, fmt.Errorf("coreradio: parse image link: %w", err)
 		}
 
-		news.ImageLink, ok = itemDoc.Find("img[src]").Attr("src")
-		if !ok {
-			return nil, fmt.Errorf("coreradio: Find: image: not found: link=%s", item.Link)
+		if il.Query().Get("url") != "" {
+			imageLink, err = DecodeBase64(il.Query().Get("url"))
+			if err != nil {
+				return nil, fmt.Errorf("coreradio: decode image base64: %w", err)
+			}
+
+			imageLink = ExtractAfterDecode(imageLink)
 		}
+
+		news.ImageLink = WebpToPng(imageLink)
 	}
-	news.ImageLink = WebpToPng(news.ImageLink)
 
 	// download link
 	doc.
-		Find("#dle-content > div.full-news > div.full-news-top > div.full-news-right > center > div").
+		Find(".quotel").
 		Find("a[href]").
 		Each(DownloadLinkSelector(news))
 
 	if len(news.DownloadLink) == 0 {
-		return nil, ErrSkipItem
+		return nil, fmt.Errorf("coreradio: download link not found: %w", ErrSkipItem)
 	}
 
+	var links []string
 	for i := range news.DownloadLink {
+		if !strings.Contains(news.DownloadLink[i], engineSuffix) {
+			l.Logf("[INFO] skip wrong link for parser: %s", news.DownloadLink[i])
+			continue
+		}
+
+		l.Logf("[DEBUG] link: %s\n", news.DownloadLink[i])
+
 		link, err := DecodeBase64(ExtractLink(news.DownloadLink[i]))
 		if err != nil {
-			return nil, fmt.Errorf("coreradio: DecodeBase64: link=%s", item.Link)
+			return nil, fmt.Errorf("coreradio: DecodeBase64: link=%s: %w", news.DownloadLink[i], err)
 		}
-		news.DownloadLink[i] = ExtractAfterDecode(link)
+
+		l.Logf("[DEBUG] decoded link: %s\n", link)
+
+		purl, err := url.ParseQuery(link)
+		if err != nil {
+			return nil, fmt.Errorf("coreradio: ParseQuery: link=%s: %w", link, err)
+		}
+
+		l.Logf("[DEBUG] parsed link: %s\n", purl)
+
+		if purl.Get("url") == "" {
+			l.Logf("[INFO] skip wrong link for parser: %s", news.DownloadLink[i])
+			continue
+		}
+
+		ll := ExtractAfterDecode(purl.Get("url"))
+
+		l.Logf("[DEBUG] extracted link: %s\n", ll)
+
+		links = append(links, ll)
 	}
+	news.DownloadLink = links
 
 	// text
 	content := doc.Find("#dle-content > div.full-news > div.full-news-top > div.full-news-right > div.full-news-info")
@@ -106,19 +147,30 @@ func (p *CoreRadioParser) Parse(ctx context.Context, item *gofeed.Item) (*News, 
 	}
 	news.Text = strings.TrimSpace(b.String())
 
-	if isSkippedGenre(p.Lgr, news.Text) {
-		return nil, ErrSkipItem
+	if isSkippedGenre(l, news.Text) {
+		return nil, fmt.Errorf("coreradio: genre must be skipped: %w", ErrSkipItem)
 	}
 
 	return news, nil
 }
 
-func NewNewsFromItem(item *gofeed.Item) *News {
-	return &News{
-		Title:    strings.TrimSpace(item.Title),
-		PageLink: item.Link,
-		DateTime: *item.PublishedParsed,
+func NewNewsFromItem(item *gofeed.Item) (*News, error) {
+	itemDoc, err := goquery.NewDocumentFromReader(bytes.NewBufferString(item.Description))
+	if err != nil {
+		return nil, fmt.Errorf("coreradio: NewDocumentFromReader: Description: %w", err)
 	}
+
+	imageLink, ok := itemDoc.Find("img[src]").Attr("src")
+	if !ok {
+		return nil, fmt.Errorf("coreradio: Find: image: not found: link=%s", item.Link)
+	}
+
+	return &News{
+		Title:     strings.TrimSpace(item.Title),
+		PageLink:  item.Link,
+		DateTime:  *item.PublishedParsed,
+		ImageLink: WebpToPng(imageLink),
+	}, nil
 }
 
 func GetPage(ctx context.Context, client *http.Client, link string) (*http.Response, error) {
@@ -147,9 +199,11 @@ func DecodeBase64(s string) (string, error) {
 	return string(b), nil
 }
 
+const engineSuffix = "/engine/go.php?url="
+
 func ExtractLink(s string) string {
 	const (
-		engineURL   = "https://coreradio.ru/engine/go.php?url="
+		engineURL   = "https://" + coreradioHost + engineSuffix
 		equalSymbol = "%3D"
 		slash       = "%2F"
 		slashLen    = len(slash)
