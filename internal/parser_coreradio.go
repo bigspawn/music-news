@@ -210,8 +210,11 @@ func ExtractLink(s string) string {
 	)
 	s = strings.TrimPrefix(s, engineURL)
 	s = strings.TrimSuffix(s, equalSymbol)
-	s = s[strings.Index(s, slash)+slashLen:]
-	return s
+	idx := strings.Index(s, slash)
+	if idx == -1 {
+		return s
+	}
+	return s[idx+slashLen:]
 }
 
 func ExtractAfterDecode(s string) string {
@@ -220,6 +223,9 @@ func ExtractAfterDecode(s string) string {
 		questionRune = '?'
 	)
 	s = strings.TrimLeft(s, prefixS)
-	s = s[:strings.IndexRune(s, questionRune)]
-	return s
+	idx := strings.IndexRune(s, questionRune)
+	if idx == -1 {
+		return s
+	}
+	return s[:idx]
 }
