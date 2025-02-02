@@ -12,7 +12,7 @@ import (
 
 const (
 	driver      = "sqlite3"
-	insertQuery = `			insert into main.news(title, playlist, date_time, imageurl, downloadurl, pageurl, posted, created_at) 
+	insertQuery = `			insert into main.news(title, playlist, date_time, imageurl, downloadurl, pageurl, posted, created_at)
 							values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`
 
 	selectNotified = `		select id, title, playlist, imageurl, date_time, downloadurl
@@ -23,8 +23,8 @@ const (
 							  and created_at > strftime('%Y-%m-%d %H:%M:%S+00:00', 'now', 'utc', '-1 months')
 							order by date_time`
 
-	updateNotified = `		update main.news 
-							set notified = true 
+	updateNotified = `		update main.news
+							set notified = true
 							where id = $1`
 
 	selectUnpublished = `	select id, title, playlist, imageurl, date_time, downloadurl, pageurl
@@ -33,23 +33,23 @@ const (
 							  and created_at > strftime('%Y-%m-%d %H:%M:%S+00:00', 'now', 'utc', '-1 months')
 							order by created_at`
 
-	updatePosted = `		update main.news 
-							set posted = true 
+	updatePosted = `		update main.news
+							set posted = true
 							where title = $1`
 
-	selectExists = `		select * 
-							from main.news 
+	selectExists = `		select *
+							from main.news
 							where title like '%' || $1 || '%'`
 
 	selectAll = `			select id, title, date_time, downloadurl, imageurl, playlist, posted, notified, created_at
 							from main.news`
 
-	updatePostedByID = `	update main.news 
-							set posted = true 
+	updatePostedByID = `	update main.news
+							set posted = true
 							where id = $1`
 
-	updatePostedAndNotifiedByID = `	update main.news 
-									set posted = true, notified = true 
+	updatePostedAndNotifiedByID = `	update main.news
+									set posted = true, notified = true
 									where id = $1`
 )
 
@@ -108,6 +108,10 @@ func (s *Store) Exist(ctx context.Context, title string) (bool, error) {
 }
 
 func (s *Store) Insert(ctx context.Context, n News) (int, error) {
+	link := ""
+	if len(n.DownloadLink) > 0 {
+		link = n.DownloadLink[0]
+	}
 	var id int
 	row := s.DB.QueryRowContext(
 		ctx,
@@ -116,7 +120,7 @@ func (s *Store) Insert(ctx context.Context, n News) (int, error) {
 		n.Text,
 		n.DateTime,
 		n.ImageLink,
-		n.DownloadLink[0],
+		link,
 		n.PageLink,
 		false,
 		time.Now().UTC(),

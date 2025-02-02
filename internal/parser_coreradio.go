@@ -82,11 +82,11 @@ func ParseHtml(ctx context.Context, l lgr.L, news *News, r io.Reader) (*News, er
 	var links []string
 	for i := range news.DownloadLink {
 		if !strings.Contains(news.DownloadLink[i], engineSuffix) {
-			l.Logf("[INFO] skip wrong link for parser: %s", news.DownloadLink[i])
+			l.Logf("[INFO]coreradio:  skip wrong link for parser: %s", news.DownloadLink[i])
 			continue
 		}
 
-		l.Logf("[DEBUG] link: %s\n", news.DownloadLink[i])
+		l.Logf("[DEBUG] coreradio: link: %s\n", news.DownloadLink[i])
 
 		link, err := DecodeBase64(ExtractLink(news.DownloadLink[i]))
 		if err != nil {
@@ -102,16 +102,21 @@ func ParseHtml(ctx context.Context, l lgr.L, news *News, r io.Reader) (*News, er
 
 		l.Logf("[DEBUG] parsed link: %s\n", purl)
 
-		if purl.Get("url") == "" {
-			l.Logf("[INFO] skip wrong link for parser: %s", news.DownloadLink[i])
-			continue
+		var ll string
+		switch {
+		case purl.Get("url") != "":
+			ll = ExtractAfterDecode(purl.Get("url"))
+		case purl.Get("s") != "":
+			ll = ExtractAfterDecode(purl.Get("s"))
+		default:
+			l.Logf("[INFO] coreradio: skip link: %s\n", link)
 		}
 
-		ll := ExtractAfterDecode(purl.Get("url"))
+		if ll != "" {
+			l.Logf("[DEBUG] coreradio: extracted link: %s\n", ll)
+			links = append(links, ll)
+		}
 
-		l.Logf("[DEBUG] extracted link: %s\n", ll)
-
-		links = append(links, ll)
 	}
 	news.DownloadLink = links
 
