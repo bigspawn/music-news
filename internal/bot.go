@@ -34,7 +34,7 @@ type RetryableBotApi struct {
 
 func NewRetryableBotApi(params RetryableBotApiParams) (*RetryableBotApi, error) {
 	if err := params.Validate(); err != nil {
-		return nil, fm
+		return nil, fmt.Errorf("invalid params: %w", err)
 	}
 	return &RetryableBotApi{
 		RetryableBotApiParams: params,
