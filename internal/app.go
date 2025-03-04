@@ -91,10 +91,11 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 		return nil, fmt.Errorf("failed to run alter portal scraper: %w", err)
 	}
 
-	err = runGetRockMusic(ctx, lgr, store, httpClient, ch, scheduler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to run get rock music scraper: %w", err)
-	}
+	// cloudflare: 403 Forbidden
+	// err = runGetRockMusic(ctx, lgr, store, httpClient, ch, scheduler)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to run get rock music scraper: %w", err)
+	// }
 
 	_, err = createPublisher(ctx, lgr, store, bot, opt, ch)
 	if err != nil {

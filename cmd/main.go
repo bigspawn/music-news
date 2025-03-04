@@ -47,8 +47,6 @@ func main() {
 		logger.Logf("[FATAL] start application: err=%v", err)
 	}
 
-	internal.StatusHealth(logger)
-
 	ch := make(chan os.Signal, 2)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM)
 

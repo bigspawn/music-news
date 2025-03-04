@@ -1,0 +1,14 @@
+services:
+  app:
+    image: ghcr.io/bigspawn/music-news
+    container_name: news_notifier_app
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    env_file:
+      - .env.dev
+    volumes:
+      - ./local:/home/db
+    restart: on-failure
