@@ -34,7 +34,7 @@ type RetryableBotApi struct {
 
 func NewRetryableBotApi(params RetryableBotApiParams) (*RetryableBotApi, error) {
 	if err := params.Validate(); err != nil {
-		return nil, err
+		return nil, fm
 	}
 	return &RetryableBotApi{
 		RetryableBotApiParams: params,
@@ -47,13 +47,15 @@ func (api RetryableBotApi) SendNews(ctx context.Context, n News) error {
 		return nil
 	}
 
-	retryErr := api.retry(ctx, n.Title, err, func() error { return api.SendNews(ctx, n) })
-	if retryErr == nil {
-		return nil
-	}
-
 	if id > 0 {
 		_ = api.Delete(ctx, id)
+	}
+
+	retryErr := api.retry(ctx, n.Title, err, func() error {
+		return api.SendNews(ctx, n)
+	})
+	if retryErr == nil {
+		return nil
 	}
 
 	return retryErr
@@ -136,19 +138,19 @@ func NewBotAPI(params BotAPIParams) (*BotAPI, error) {
 func (api *BotAPI) SendNews(ctx context.Context, n News) (int, error) {
 	id, err := api.SendImageByLink(ctx, n.ImageLink)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to send image: %w", err)
 	}
 
 	pageLinkURL, err := EncodeQuery(n.PageLink)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to encode page link: %w", err)
 	}
 
 	keyboard := [][]tb.InlineButton{{{Text: "Site Page", URL: pageLinkURL}}}
 	for i, s := range n.DownloadLink {
 		l, err := EncodeQuery(s)
 		if err != nil {
-			return 0, err
+			return 0, fmt.Errorf("failed to encode download link: %w", err)
 		}
 
 		if s == "" {
@@ -165,7 +167,7 @@ func (api *BotAPI) SendNews(ctx context.Context, n News) (int, error) {
 
 	msg, err := api.Bot.Send(api.ChantID, text, &tb.ReplyMarkup{InlineKeyboard: keyboard})
 	if err != nil {
-		return id, err
+		return id, fmt.Errorf("failed to send news: %w", err)
 	}
 
 	return msg.ID, nil
@@ -174,12 +176,12 @@ func (api *BotAPI) SendNews(ctx context.Context, n News) (int, error) {
 func (api *BotAPI) SendImageByLink(ctx context.Context, imageLink string) (int, error) {
 	link, err := EncodeQuery(imageLink)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to encode image link: %w", err)
 	}
 
 	msg, err := api.Bot.Send(api.ChantID, &tb.Photo{File: tb.FromURL(link)})
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to send image: %w", err)
 	}
 
 	return msg.ID, nil
@@ -199,16 +201,16 @@ type ReleaseNews struct {
 func (api *BotAPI) SendReleaseNews(ctx context.Context, n ReleaseNews) (int, error) {
 	id, err := api.SendImageByLink(ctx, n.ImageLink)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to send image: %w", err)
 	}
 
 	text := fmt.Sprintf("%s\n%s\n<a href=\"%s\">Release album link</a>", n.Title, n.Text, n.ReleaseLink)
 
-	rows := make([]tb.InlineButton, 0, len(n.DownloadLink))
+	rows := make([]tb.InlineButton, 0, len(n.PlatformLinks))
 	for platform, link := range n.PlatformLinks {
 		linkURL, eErr := EncodeQuery(link)
 		if eErr != nil {
-			return id, eErr
+			return id, fmt.Errorf("failed to encode platform link: %w", eErr)
 		}
 
 		rows = append(rows, tb.InlineButton{Text: string(platform), URL: linkURL})
@@ -222,7 +224,7 @@ func (api *BotAPI) SendReleaseNews(ctx context.Context, n ReleaseNews) (int, err
 		InlineKeyboard: [][]tb.InlineButton{rows},
 	})
 	if err != nil {
-		return id, err
+		return id, fmt.Errorf("failed to send message: %w", err)
 	}
 
 	return msg.ID, nil
