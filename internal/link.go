@@ -12,7 +12,7 @@ import (
 	"github.com/go-pkgz/lgr"
 )
 
-var unusedSuffixRegexp = regexp.MustCompile(`\(\d+\)|([\[(][singleSINGLEpP]+[])])`)
+var unusedSuffixRegexp = regexp.MustCompile(`\(\d+\)|([\[(][singleSINGLEpP]+[])])|(\s+-\sEP$)|(\s+\[EP\]$)`)
 
 type LinksApiParams struct {
 	Lgr          lgr.L
@@ -78,7 +78,12 @@ func (api *LinksApi) getIDiTunes(ctx context.Context, title string) (string, err
 	if err != nil {
 		return "", err
 	}
-	id, err := getID(resp.Results.Results, title)
+
+	if len(resp.Results.Results) == 0 {
+		return "", fmt.Errorf("albums in iTunes not found: title=%s", title)
+	}
+
+	id, err := findCollectionIDFromResultsByTitle(api.Lgr, resp.Results.Results, title)
 	if err != nil {
 		api.Lgr.Logf("[INFO] iTunes response: %v", resp)
 		return "", err
@@ -105,27 +110,68 @@ func clearTitle(title string) string {
 	return title
 }
 
-func getID(results []itunes.Result, title string) (string, error) {
-	lowerTitle := strings.ToLower(title)
-	count := 0
+func findCollectionIDFromResultsByTitle(l lgr.L, results []itunes.Result, title string) (string, error) {
+	title = strings.ToLower(title)
+	title = clearTitle(title)
 	for _, item := range results {
-		var tokens []string
-		tokens = append(tokens,
-			append(
-				strings.Split(strings.ToLower(item.ArtistName), " "),
-				strings.Split(strings.ToLower(item.CollectionName), " ")...,
-			)...,
-		)
-		for _, token := range tokens {
-			if strings.Contains(lowerTitle, token) {
-				count++
-			}
-		}
-		percent := float64(count) / float64(len(tokens)) * float64(100)
-		if percent >= 65 {
+		t := item.ArtistName + " - " + item.CollectionName
+		t = clearTitle(t)
+		t = strings.ToLower(t)
+		n := levenshteinDistance(t, title)
+		if n <= 10 {
 			return strconv.Itoa(item.CollectionId), nil
+		}
+		l.Logf("[INFO] levenshteinDistance(%s, %s) = %d", t, title, n)
+	}
+	return "", fmt.Errorf("albums in iTunes not found: title=%s", title)
+}
+
+func levenshteinDistance(s1, s2 string) int {
+	runes1 := []rune(s1)
+	runes2 := []rune(s2)
+
+	if len(runes1) == 0 {
+		return len(runes2)
+	}
+	if len(runes2) == 0 {
+		return len(runes1)
+	}
+
+	matrix := make([][]int, len(runes1)+1)
+	for i := range matrix {
+		matrix[i] = make([]int, len(runes2)+1)
+	}
+
+	for i := 0; i <= len(runes1); i++ {
+		matrix[i][0] = i
+	}
+	for j := 0; j <= len(runes2); j++ {
+		matrix[0][j] = j
+	}
+
+	for i := 1; i <= len(runes1); i++ {
+		for j := 1; j <= len(runes2); j++ {
+			cost := 1
+			if runes1[i-1] == runes2[j-1] {
+				cost = 0
+			}
+
+			matrix[i][j] = min(
+				matrix[i-1][j]+1,
+				min(
+					matrix[i][j-1]+1,
+					matrix[i-1][j-1]+cost,
+				),
+			)
 		}
 	}
 
-	return "", fmt.Errorf("albums in iTunes not found: title=%s", title)
+	return matrix[len(runes1)][len(runes2)]
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

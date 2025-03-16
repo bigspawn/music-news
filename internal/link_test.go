@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	itunes "github.com/bigspawn/go-itunes-api"
+	"github.com/go-pkgz/lgr"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -74,6 +77,8 @@ func Test_clearTitle(t *testing.T) {
 		{title: "Foad - Returner (2020)", want: "Foad - Returner"},
 		{title: "Trees Will Tell - Negative Results (2020)", want: "Trees Will Tell - Negative Results"},
 		{title: "Agriculture - Agriculture (2023)", want: "Agriculture - Agriculture"},
+		{title: "Who Will Fix Me Now? - EP", want: "Who Will Fix Me Now?"},
+		{title: "Who Will Fix Me Now - EP? - EP", want: "Who Will Fix Me Now - EP?"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.title, func(t *testing.T) {
@@ -95,4 +100,123 @@ func TestName(t *testing.T) {
 	})
 	require.NoError(t, err)
 	fmt.Println(resp)
+}
+
+func Test_levenshteinDistance(t *testing.T) {
+	tests := []struct {
+		name     string
+		s1       string
+		s2       string
+		expected int
+	}{
+		{
+			name:     "identical strings",
+			s1:       "test",
+			s2:       "test",
+			expected: 0,
+		},
+		{
+			name:     "one character difference",
+			s1:       "test",
+			s2:       "tent",
+			expected: 1,
+		},
+		{
+			name:     "one character insertion",
+			s1:       "test",
+			s2:       "tests",
+			expected: 1,
+		},
+		{
+			name:     "one character deletion",
+			s1:       "tests",
+			s2:       "test",
+			expected: 1,
+		},
+		{
+			name:     "completely different strings",
+			s1:       "kitten",
+			s2:       "sitting",
+			expected: 3,
+		},
+		{
+			name:     "empty strings",
+			s1:       "",
+			s2:       "",
+			expected: 0,
+		},
+		{
+			name:     "one empty string",
+			s1:       "music",
+			s2:       "",
+			expected: 5,
+		},
+		{
+			name:     "case difference",
+			s1:       "Test",
+			s2:       "test",
+			expected: 1,
+		},
+		{
+			name:     "unicode characters",
+			s1:       "привет",
+			s2:       "привет мир",
+			expected: 4,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := levenshteinDistance(tc.s1, tc.s2)
+			assert.Equal(t, tc.expected, result, "levenshtein distance calculation was incorrect")
+		})
+	}
+}
+
+func Test_findCollectionIDFromResultsByTitle(t *testing.T) {
+	tests := []struct {
+		name     string
+		r        itunes.Result
+		s        string
+		expected string
+		wantErr  bool
+	}{
+		{
+			name: "found",
+			r: itunes.Result{
+				ArtistName:     "Slow Degrade",
+				CollectionName: "Who Will Fix Me Now? - EP",
+				ReleaseDate:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   123,
+			},
+			s:        "Slow Degrade — Who Will Fix Me Now? [EP] (2024)",
+			expected: "123",
+			wantErr:  false,
+		},
+		{
+			name: "UPFALL - ARTIFICIAL - EP",
+			r: itunes.Result{
+				ArtistName:     "UPFALL",
+				CollectionName: "ARTIFICIAL - EP",
+				ReleaseDate:    time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   123,
+			},
+			s:        "Upfall - Artificial (EP) (2025)",
+			expected: "123",
+			wantErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := findCollectionIDFromResultsByTitle(lgr.Default(), []itunes.Result{tt.r}, tt.s)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("findCollectionIDFromResultsByTitle() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got != tt.expected {
+				t.Errorf("findCollectionIDFromResultsByTitle() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
 }

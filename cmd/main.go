@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"math/rand"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/go-pkgz/lgr"
 	"github.com/jessevdk/go-flags"
@@ -17,8 +15,6 @@ import (
 )
 
 func main() {
-	rand.Seed(time.Now().UnixNano())
-
 	logger := lgr.New(lgr.Msec, lgr.Debug, lgr.CallerFile, lgr.CallerFunc)
 
 	_, err := maxprocs.Set(maxprocs.Logger(logger.Logf))

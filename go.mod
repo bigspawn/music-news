@@ -6,7 +6,7 @@ toolchain go1.24.0
 
 require (
 	github.com/PuerkitoBio/goquery v1.10.2
-	github.com/bigspawn/go-itunes-api v0.0.1
+	github.com/bigspawn/go-itunes-api v0.0.3
 	github.com/bigspawn/go-odesli v0.0.4
 	github.com/go-co-op/gocron v1.37.0
 	github.com/go-pkgz/lgr v0.12.0

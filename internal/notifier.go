@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/go-pkgz/lgr"
 )
@@ -62,12 +61,6 @@ func (n *Notifier) Notify(ctx context.Context) error {
 			continue
 		}
 		n.Lgr.Logf("[INFO] notify was send [%s]", item.Title)
-
-		duration := time.Duration(RandBetween(10_000, 1)) * time.Millisecond
-
-		n.Lgr.Logf("[INFO] sleep between next notify [%s]", duration)
-
-		WaitUntil(ctx, duration)
 	}
 
 	return nil

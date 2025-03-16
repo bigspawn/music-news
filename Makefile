@@ -18,7 +18,7 @@ lint: ## Run code linters
 
 test: ## Run tests with race condition detection
 	@echo "Running tests..."
-	go test -v -count 1 -race ./...
+	CGO_ENABLED=0 go test -v -count 1 -race ./...
 
 build: ## Build the application binary
 	@echo "Building application..."
@@ -32,7 +32,7 @@ run_parser: ## Run the parser service
 
 run_notifier: ## Run the notifier service
 	@echo "Running notifier..."
-	NOTIFY=true go run $(MAIN_PATH)
+	ONLY_NOTIFIER=true go run $(MAIN_PATH)
 
 run: ## Run service with environment variables from .env file
 	@echo "Starting service with .env configuration..."

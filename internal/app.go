@@ -77,36 +77,39 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 	}
 
 	var (
-		ch         = make(chan []News)
-		httpClient = NewHttpClient(NewDialer())
+		ch            = make(chan []News)
+		httpClient    = NewHttpClient(NewDialer())
+		reNotifiedJob *ReNotifiedJob
 	)
 
-	err = runCoreRadio(ctx, lgr, store, httpClient, ch, scheduler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to run core radio scraper: %w", err)
+	if !opt.OnlyNotifier {
+		err = runCoreRadio(ctx, lgr, store, httpClient, ch, scheduler)
+		if err != nil {
+			return nil, fmt.Errorf("failed to run core radio scraper: %w", err)
+		}
+
+		err = runAlterPortal(ctx, lgr, store, httpClient, ch, scheduler)
+		if err != nil {
+			return nil, fmt.Errorf("failed to run alter portal scraper: %w", err)
+		}
+
+		// cloudflare: 403 Forbidden
+		// err = runGetRockMusic(ctx, lgr, store, httpClient, ch, scheduler)
+		// if err != nil {
+		// 	return nil, fmt.Errorf("failed to run get rock music scraper: %w", err)
+		// }
+
+		_, err = createPublisher(ctx, lgr, store, bot, opt, ch)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create publisher: %w", err)
+		}
+
+		reNotifiedJob = NewReNotifiedJob(ReNotifiedJobParams{
+			lgr:   lgr,
+			store: store,
+			ch:    ch,
+		})
 	}
-
-	err = runAlterPortal(ctx, lgr, store, httpClient, ch, scheduler)
-	if err != nil {
-		return nil, fmt.Errorf("failed to run alter portal scraper: %w", err)
-	}
-
-	// cloudflare: 403 Forbidden
-	// err = runGetRockMusic(ctx, lgr, store, httpClient, ch, scheduler)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to run get rock music scraper: %w", err)
-	// }
-
-	_, err = createPublisher(ctx, lgr, store, bot, opt, ch)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create publisher: %w", err)
-	}
-
-	reNotifiedJob := NewReNotifiedJob(ReNotifiedJobParams{
-		lgr:   lgr,
-		store: store,
-		ch:    ch,
-	})
 
 	return &App{
 		lgr:           lgr,
@@ -119,12 +122,16 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 
 func (a *App) Start(ctx context.Context) error {
 	go a.scheduler.StartAsync()
-	go a.reNotifiedJob.Run(ctx)
+	if a.reNotifiedJob != nil {
+		go a.reNotifiedJob.Run(ctx)
+	}
 	return nil
 }
 
 func (a *App) Stop() {
-	a.reNotifiedJob.Stop()
+	if a.reNotifiedJob != nil {
+		a.reNotifiedJob.Stop()
+	}
 	a.scheduler.Stop()
 	a.scheduler.Clear()
 	a.store.Stop()
