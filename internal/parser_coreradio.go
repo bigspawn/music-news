@@ -82,7 +82,7 @@ func ParseHtml(ctx context.Context, l lgr.L, news *News, r io.Reader) (*News, er
 	var links []string
 	for i := range news.DownloadLink {
 		if !strings.Contains(news.DownloadLink[i], engineSuffix) {
-			l.Logf("[INFO]coreradio:  skip wrong link for parser: %s", news.DownloadLink[i])
+			l.Logf("[INFO]coreradio: skip wrong link for parser: %s", news.DownloadLink[i])
 			continue
 		}
 

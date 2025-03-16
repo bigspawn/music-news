@@ -32,7 +32,7 @@ run_parser: ## Run the parser service
 
 run_notifier: ## Run the notifier service
 	@echo "Running notifier..."
-	NOTIFY=true go run $(MAIN_PATH)
+	ONLY_NOTIFIER=true go run $(MAIN_PATH)
 
 run: ## Run service with environment variables from .env file
 	@echo "Starting service with .env configuration..."
