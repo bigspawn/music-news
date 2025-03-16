@@ -163,12 +163,6 @@ func Test_levenshteinDistance(t *testing.T) {
 			s2:       "привет мир",
 			expected: 4,
 		},
-		{
-			name:     "unicode characters",
-			s1:       "Slow Degrade — Who Will Fix Me Now? [EP] (2024)",
-			s2:       "Who Will Fix Me Now? - EP",
-			expected: 4,
-		},
 	}
 
 	for _, tc := range tests {

@@ -18,7 +18,7 @@ lint: ## Run code linters
 
 test: ## Run tests with race condition detection
 	@echo "Running tests..."
-	go test -v -count 1 -race ./...
+	CGO_ENABLED=0 go test -v -count 1 -race ./...
 
 build: ## Build the application binary
 	@echo "Building application..."
