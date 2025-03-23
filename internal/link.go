@@ -114,6 +114,9 @@ func findCollectionIDFromResultsByTitle(l lgr.L, results []itunes.Result, title 
 	title = strings.ToLower(title)
 	title = clearTitle(title)
 	for _, item := range results {
+		if item.Kind != itunes.KindAlbum {
+			continue
+		}
 		t := item.ArtistName + " - " + item.CollectionName
 		t = clearTitle(t)
 		t = strings.ToLower(t)
