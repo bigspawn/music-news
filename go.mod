@@ -16,7 +16,7 @@ require (
 	github.com/prometheus/client_golang v1.21.1
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/automaxprocs v1.6.0
-	golang.org/x/net v0.37.0
+	golang.org/x/net v0.38.0
 	gopkg.in/telebot.v3 v3.3.8
 )
 
