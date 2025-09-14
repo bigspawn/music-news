@@ -145,6 +145,9 @@ func ParseHtml(ctx context.Context, l lgr.L, news *News, r io.Reader) (*News, er
 
 	b = &strings.Builder{}
 	for _, s := range strings.Split(news.Text, "\n") {
+		if len(s) == 0 {
+			continue
+		}
 		if s[0] != '.' {
 			b.WriteString(strings.TrimSpace(s))
 			b.WriteRune('\n')
@@ -223,14 +226,6 @@ func ExtractLink(s string) string {
 }
 
 func ExtractAfterDecode(s string) string {
-	const (
-		prefixS      = "s="
-		questionRune = '?'
-	)
-	s = strings.TrimLeft(s, prefixS)
-	idx := strings.IndexRune(s, questionRune)
-	if idx == -1 {
-		return s
-	}
-	return s[:idx]
+	const prefixS = "s="
+	return strings.TrimPrefix(s, prefixS)
 }
