@@ -178,6 +178,11 @@ func createNotifier(
 		Hour().
 		DoWithJobDetails(func(job gocron.Job) {
 			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						lgr.Logf("[ERROR] PANIC recovered in notifier: %v", r)
+					}
+				}()
 				if nErr := notifier.Notify(ctx); nErr != nil {
 					lgr.Logf("[ERROR] notifier %v", nErr)
 				}
@@ -227,6 +232,11 @@ func runCoreRadio(
 		Minutes().
 		DoWithJobDetails(func(job gocron.Job) {
 			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						lgr.Logf("[ERROR] PANIC recovered in CoreRadio scraper: %v", r)
+					}
+				}()
 				sErr := s.Scrape(ctx)
 				if sErr != nil {
 					lgr.Logf("[ERROR] failed to scrape %s: %v", s.name, sErr)
@@ -278,6 +288,11 @@ func runGetRockMusic(
 		Minutes().
 		DoWithJobDetails(func(job gocron.Job) {
 			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						lgr.Logf("[ERROR] PANIC recovered in GetRockMusic scraper: %v", r)
+					}
+				}()
 				sErr := s.Scrape(ctx)
 				if sErr != nil {
 					lgr.Logf("[ERROR] failed to scrape %s: %v", s.name, sErr)
@@ -329,6 +344,11 @@ func runAlterPortal(
 		Minutes().
 		DoWithJobDetails(func(job gocron.Job) {
 			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						lgr.Logf("[ERROR] PANIC recovered in AlterPortal scraper: %v", r)
+					}
+				}()
 				sErr := s.Scrape(ctx)
 				if sErr != nil {
 					lgr.Logf("[ERROR] failed to scrape %s: %v", s.name, sErr)
@@ -377,6 +397,11 @@ func createPublisher(
 	}
 
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				lgr.Logf("[ERROR] PANIC recovered in publisher: %v", r)
+			}
+		}()
 		sErr := publisher.Start(ctx)
 		if sErr != nil {
 			lgr.Logf("[ERROR] failed to start publisher: %v", sErr)

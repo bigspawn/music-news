@@ -22,6 +22,8 @@ var fileHosts = map[string]struct{}{
 	"mega.nz":          {},
 	"megaup.net":       {},
 	"solidfiles.com":   {},
+	"t.me":             {}, // Telegram links support
+	"telegram.me":      {}, // Alternative Telegram domain
 	"trbbt.net":        {},
 	"turb.cc":          {},
 	"turb.pw":          {},

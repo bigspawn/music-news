@@ -74,7 +74,11 @@ func (n *Notifier) notify(ctx context.Context, item News) error {
 
 	links, err := CheckRequiredPlatforms(linksByPlatform)
 	if err != nil {
-		return fmt.Errorf("check required platforms: %w", err)
+		return fmt.Errorf("no required platforms found for [%s]: %w", item.Title, err)
+	}
+
+	if len(links) == 0 && releaseLink == "" {
+		return fmt.Errorf("no links available for [%s]", item.Title)
 	}
 
 	err = n.BotAPI.SendReleaseNews(ctx, ReleaseNews{

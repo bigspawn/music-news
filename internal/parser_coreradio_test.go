@@ -118,8 +118,9 @@ func TestExtractAfterDecode(t *testing.T) {
 		s    string
 		want string
 	}{
-		{name: "1", s: "s=https://vk.com/doc583516718_615330644?342A", want: "https://vk.com/doc583516718_615330644"},
-		{name: "2", s: "s=https://vk.com/doc160118002_618474003?984K", want: "https://vk.com/doc160118002_618474003"},
+		{name: "1", s: "s=https://vk.com/doc583516718_615330644?342A", want: "https://vk.com/doc583516718_615330644?342A"},
+		{name: "2", s: "s=https://vk.com/doc160118002_618474003?984K", want: "https://vk.com/doc160118002_618474003?984K"},
+		{name: "3", s: "s=https://s.coreradio.online/tX11w?594U", want: "https://s.coreradio.online/tX11w?594U"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
