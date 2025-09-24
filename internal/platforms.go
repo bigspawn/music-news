@@ -16,14 +16,19 @@ var requiredPlatforms = []goOdesli.Platform{
 
 func CheckRequiredPlatforms(platforms map[goOdesli.Platform]string) (map[goOdesli.Platform]string, error) {
 	result := make(map[goOdesli.Platform]string)
+	foundCount := 0
+
 	for _, platform := range requiredPlatforms {
 		if link, ok := platforms[platform]; ok {
 			result[platform] = link
-			continue
-		}
-		if platform == goOdesli.PlatformSpotify || platform == goOdesli.PlatformItunes {
-			return nil, fmt.Errorf("link for platform=%s not found", platform)
+			foundCount++
 		}
 	}
+
+	// Require at least one platform instead of mandatory iTunes and Spotify
+	if foundCount == 0 {
+		return nil, fmt.Errorf("no platform links found")
+	}
+
 	return result, nil
 }

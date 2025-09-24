@@ -48,6 +48,10 @@ const (
 							set posted = true
 							where id = $1`
 
+	selectPostedByID = `	select posted
+							from main.news
+							where id = $1`
+
 	updatePostedAndNotifiedByID = `	update main.news
 									set posted = true, notified = true
 									where id = $1`
@@ -208,6 +212,18 @@ func (s *Store) SetPosted(ctx context.Context, title string) error {
 
 func (s *Store) SetPostedByID(ctx context.Context, id int) error {
 	return s.exec(ctx, updatePostedByID, id)
+}
+
+func (s *Store) IsPosted(ctx context.Context, id int) (bool, error) {
+	var posted bool
+	err := s.DB.QueryRowContext(ctx, selectPostedByID, id).Scan(&posted)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return false, fmt.Errorf("news item with id %d not found", id)
+		}
+		return false, fmt.Errorf("failed to check posted status: %w", err)
+	}
+	return posted, nil
 }
 
 func (s *Store) GetAll(ctx context.Context) ([]News, error) {

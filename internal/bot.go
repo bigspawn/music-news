@@ -51,6 +51,15 @@ func (api RetryableBotApi) SendNews(ctx context.Context, n News) error {
 		_ = api.Delete(ctx, id)
 	}
 
+	// Return image error without fallback
+	var bErr *tb.Error
+	if errors.As(err, &bErr) && bErr.Code == 400 &&
+		(bErr.Message == "wrong type of the web page content" ||
+		 bErr.Message == "failed to get HTTP URL content") {
+		api.Lgr.Logf("[WARN] image failed for [%s]: %v", n.Title, err)
+		return err
+	}
+
 	retryErr := api.retry(ctx, n.Title, err, func() error {
 		return api.SendNews(ctx, n)
 	})
@@ -76,13 +85,22 @@ func (api *RetryableBotApi) SendReleaseNews(ctx context.Context, n ReleaseNews) 
 		return nil
 	}
 
+	if id > 0 {
+		_ = api.Delete(ctx, id)
+	}
+
+	// Return image error without fallback
+	var bErr *tb.Error
+	if errors.As(err, &bErr) && bErr.Code == 400 &&
+		(bErr.Message == "wrong type of the web page content" ||
+		 bErr.Message == "failed to get HTTP URL content") {
+		api.Lgr.Logf("[WARN] release image failed for [%s]: %v", n.Title, err)
+		return err
+	}
+
 	retryErr := api.retry(ctx, n.Title, err, func() error { return api.SendReleaseNews(ctx, n) })
 	if retryErr == nil {
 		return nil
-	}
-
-	if id > 0 {
-		_ = api.Delete(ctx, id)
 	}
 
 	return retryErr
@@ -229,6 +247,8 @@ func (api *BotAPI) SendReleaseNews(ctx context.Context, n ReleaseNews) (int, err
 
 	return msg.ID, nil
 }
+
+
 
 func WaitUntil(ctx context.Context, duration time.Duration) {
 	timer := time.NewTimer(duration)
