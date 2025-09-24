@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -218,6 +219,132 @@ func Test_findCollectionIDFromResultsByTitle(t *testing.T) {
 			}
 			if got != tt.expected {
 				t.Errorf("findCollectionIDFromResultsByTitle() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestProblematicTitlesFromLog(t *testing.T) {
+	tests := []struct {
+		name     string
+		title    string
+		expected string
+	}{
+		{
+			name:     "Cyrillic discography",
+			title:    "Soap&Skin - дискография",
+			expected: "soap&skin",
+		},
+		{
+			name:     "Cyrillic discography with year",
+			title:    "Lorna Shore - дискография",
+			expected: "lorna shore",
+		},
+		{
+			name:     "English album with year",
+			title:    "The Project Hate MCMXCIX - Undivine Dethroning (2025)",
+			expected: "the project hate mcmxcix - undivine dethroning",
+		},
+		{
+			name:     "Cyrillic album with year",
+			title:    "Mélancolia - andom.access.misery (2025)",
+			expected: "mélancolia - andom.access.misery",
+		},
+		{
+			name:     "Complex title with brackets and year",
+			title:    "Wisdom In Chains x Evergreen Terrace - Wisdom In Chains / Evergreen Terrace [split EP] (2025)",
+			expected: "wisdom in chains x evergreen terrace - wisdom in chains / evergreen terrace",
+		},
+		{
+			name:     "Album with 2CD marking",
+			title:    "Panic Lift - Split Pieces Stitched Together Again [2CD] (2025)",
+			expected: "panic lift - split pieces stitched together again",
+		},
+		{
+			name:     "Cyrillic album title with year",
+			title:    "Multipass - Песни Осени [2CD] (2013)",
+			expected: "multipass - песни осени",
+		},
+		{
+			name:     "Album with special chars",
+			title:    "NewTone - The World Сhanges (2025)",
+			expected: "newtone - the world сhanges",
+		},
+		{
+			name:     "Take It Down with Cyrillic",
+			title:    "Take It Down - Культ (2025)",
+			expected: "take it down - культ",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := clearTitle(strings.ToLower(tt.title))
+			if result != tt.expected {
+				t.Errorf("clearTitle(%s) = %s, want %s", tt.title, result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGenerateSearchVariants(t *testing.T) {
+	tests := []struct {
+		name     string
+		title    string
+		expected []string
+	}{
+		{
+			name:  "Simple artist - album format",
+			title: "Artist Name - Album Name",
+			expected: []string{
+				"Artist Name - Album Name",
+				"Artist Name",
+			},
+		},
+		{
+			name:  "Title with year",
+			title: "Artist - Album (2025)",
+			expected: []string{
+				"Artist - Album (2025)",
+				"Artist - Album",
+				"Artist",
+			},
+		},
+		{
+			name:  "Title with discography",
+			title: "Artist - дискография",
+			expected: []string{
+				"Artist - дискография",
+				"Artist",
+				"Artist",
+			},
+		},
+		{
+			name:  "Complex title",
+			title: "Take It Down - Культ (2025)",
+			expected: []string{
+				"Take It Down - Культ (2025)",
+				"Take It Down - Культ",
+				"Take It Down",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := generateSearchVariants(tt.title)
+			if len(result) != len(tt.expected) {
+				t.Errorf("generateSearchVariants(%s) returned %d variants, want %d. Got: %v",
+					tt.title, len(result), len(tt.expected), result)
+				return
+			}
+
+			// Проверяем что все ожидаемые варианты присутствуют
+			for i, expected := range tt.expected {
+				if i < len(result) && result[i] != expected {
+					t.Errorf("generateSearchVariants(%s)[%d] = %s, want %s",
+						tt.title, i, result[i], expected)
+				}
 			}
 		})
 	}
