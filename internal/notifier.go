@@ -70,12 +70,12 @@ func (n *Notifier) notify(ctx context.Context, item News) error {
 	releaseLink, linksByPlatform, err := n.Links.GetLinks(ctx, item.Title)
 	if err != nil {
 		n.Lgr.Logf("[WARN] failed to get links for [%s]: %v", item.Title, err)
-		// Попытаемся отправить уведомление без ссылок на платформы
+		// Try to send notification without platform links
 		if releaseLink == "" && len(item.DownloadLink) == 0 {
 			return fmt.Errorf("no links available for [%s]: %w", item.Title, err)
 		}
 
-		// Используем обычное уведомление с загрузочными ссылками
+		// Use regular notification with download links
 		err = n.BotAPI.SendNews(ctx, item)
 		if err != nil {
 			return fmt.Errorf("send news: %w", err)
@@ -84,13 +84,13 @@ func (n *Notifier) notify(ctx context.Context, item News) error {
 		links, err := CheckRequiredPlatforms(linksByPlatform)
 		if err != nil {
 			n.Lgr.Logf("[WARN] no required platforms found for [%s]: %v", item.Title, err)
-			// Отправляем обычное уведомление вместо release уведомления
+			// Send regular notification instead of release notification
 			err = n.BotAPI.SendNews(ctx, item)
 			if err != nil {
 				return fmt.Errorf("send news: %w", err)
 			}
 		} else {
-			// Отправляем release уведомление с ссылками на платформы
+			// Send release notification with platform links
 			err = n.BotAPI.SendReleaseNews(ctx, ReleaseNews{
 				News:          item,
 				ReleaseLink:   releaseLink,

@@ -25,7 +25,7 @@ func CheckRequiredPlatforms(platforms map[goOdesli.Platform]string) (map[goOdesl
 		}
 	}
 
-	// Требуем хотя бы одну платформу вместо обязательных iTunes и Spotify
+	// Require at least one platform instead of mandatory iTunes and Spotify
 	if foundCount == 0 {
 		return nil, fmt.Errorf("no platform links found")
 	}

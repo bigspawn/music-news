@@ -339,7 +339,7 @@ func TestGenerateSearchVariants(t *testing.T) {
 				return
 			}
 
-			// Проверяем что все ожидаемые варианты присутствуют
+			// Check that all expected variants are present
 			for i, expected := range tt.expected {
 				if i < len(result) && result[i] != expected {
 					t.Errorf("generateSearchVariants(%s)[%d] = %s, want %s",

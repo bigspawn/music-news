@@ -51,19 +51,13 @@ func (api RetryableBotApi) SendNews(ctx context.Context, n News) error {
 		_ = api.Delete(ctx, id)
 	}
 
-	// Проверяем ошибки изображений и используем fallback
+	// Return image error without fallback
 	var bErr *tb.Error
 	if errors.As(err, &bErr) && bErr.Code == 400 &&
 		(bErr.Message == "wrong type of the web page content" ||
 		 bErr.Message == "failed to get HTTP URL content") {
-		api.Lgr.Logf("[WARN] image failed for [%s], using text fallback: %v", n.Title, err)
-
-		_, textErr := api.Bot.SendNewsAsText(ctx, n)
-		if textErr == nil {
-			return nil
-		}
-		api.Lgr.Logf("[ERROR] text fallback also failed for [%s]: %v", n.Title, textErr)
-		return textErr
+		api.Lgr.Logf("[WARN] image failed for [%s]: %v", n.Title, err)
+		return err
 	}
 
 	retryErr := api.retry(ctx, n.Title, err, func() error {
@@ -95,19 +89,13 @@ func (api *RetryableBotApi) SendReleaseNews(ctx context.Context, n ReleaseNews) 
 		_ = api.Delete(ctx, id)
 	}
 
-	// Проверяем ошибки изображений и используем fallback
+	// Return image error without fallback
 	var bErr *tb.Error
 	if errors.As(err, &bErr) && bErr.Code == 400 &&
 		(bErr.Message == "wrong type of the web page content" ||
 		 bErr.Message == "failed to get HTTP URL content") {
-		api.Lgr.Logf("[WARN] release image failed for [%s], using text fallback: %v", n.Title, err)
-
-		_, textErr := api.Bot.SendReleaseNewsAsText(ctx, n)
-		if textErr == nil {
-			return nil
-		}
-		api.Lgr.Logf("[ERROR] release text fallback also failed for [%s]: %v", n.Title, textErr)
-		return textErr
+		api.Lgr.Logf("[WARN] release image failed for [%s]: %v", n.Title, err)
+		return err
 	}
 
 	retryErr := api.retry(ctx, n.Title, err, func() error { return api.SendReleaseNews(ctx, n) })
@@ -260,69 +248,7 @@ func (api *BotAPI) SendReleaseNews(ctx context.Context, n ReleaseNews) (int, err
 	return msg.ID, nil
 }
 
-func (api *BotAPI) SendNewsAsText(ctx context.Context, n News) (int, error) {
-	pageLinkURL, err := EncodeQuery(n.PageLink)
-	if err != nil {
-		return 0, fmt.Errorf("failed to encode page link: %w", err)
-	}
 
-	keyboard := [][]tb.InlineButton{{{Text: "Site Page", URL: pageLinkURL}}}
-	for i, s := range n.DownloadLink {
-		l, err := EncodeQuery(s)
-		if err != nil {
-			return 0, fmt.Errorf("failed to encode download link: %w", err)
-		}
-
-		if s == "" {
-			continue
-		}
-
-		keyboard[0] = append(keyboard[0], tb.InlineButton{
-			Text: fmt.Sprintf("Download_%d", i),
-			URL:  l,
-		})
-	}
-
-	text := fmt.Sprintf("<b>%s</b>\n%s\n\n🖼️ <i>Image failed to load</i>", n.Title, n.Text)
-
-	msg, err := api.Bot.Send(api.ChantID, text, &tb.ReplyMarkup{InlineKeyboard: keyboard}, &tb.SendOptions{
-		ParseMode: tb.ModeHTML,
-	})
-	if err != nil {
-		return 0, fmt.Errorf("failed to send text message: %w", err)
-	}
-
-	return msg.ID, nil
-}
-
-func (api *BotAPI) SendReleaseNewsAsText(ctx context.Context, n ReleaseNews) (int, error) {
-	text := fmt.Sprintf("<b>%s</b>\n%s\n<a href=\"%s\">Release album link</a>\n\n🖼️ <i>Image failed to load</i>", n.Title, n.Text, n.ReleaseLink)
-
-	rows := make([]tb.InlineButton, 0, len(n.PlatformLinks))
-	for platform, link := range n.PlatformLinks {
-		linkURL, err := EncodeQuery(link)
-		if err != nil {
-			return 0, fmt.Errorf("failed to encode platform link: %w", err)
-		}
-
-		rows = append(rows, tb.InlineButton{Text: string(platform), URL: linkURL})
-	}
-
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i].Text > rows[j].Text
-	})
-
-	msg, err := api.Bot.Send(api.ChantID, text, &tb.ReplyMarkup{
-		InlineKeyboard: [][]tb.InlineButton{rows},
-	}, &tb.SendOptions{
-		ParseMode: tb.ModeHTML,
-	})
-	if err != nil {
-		return 0, fmt.Errorf("failed to send text release message: %w", err)
-	}
-
-	return msg.ID, nil
-}
 
 func WaitUntil(ctx context.Context, duration time.Duration) {
 	timer := time.NewTimer(duration)

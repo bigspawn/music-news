@@ -82,7 +82,7 @@ func (api *LinksApi) getIDiTunes(ctx context.Context, title string) (string, err
 
 	api.Lgr.Logf("[DEBUG] trying search variants for title [%s]: %v", title, variants)
 
-	// Пробуем каждый вариант поиска
+	// Try each search variant
 	for i, variant := range variants {
 		api.Lgr.Logf("[DEBUG] trying variant %d: %s", i+1, variant)
 
@@ -102,7 +102,7 @@ func (api *LinksApi) getIDiTunes(ctx context.Context, title string) (string, err
 
 		api.Lgr.Logf("[DEBUG] found %d results for variant [%s]", len(resp.Results.Results), variant)
 
-		// Пробуем с разными порогами distance
+		// Try with different distance thresholds
 		thresholds := []int{5, 10, 15, 20}
 		for _, threshold := range thresholds {
 			id, err := findCollectionIDFromResultsByTitleWithThreshold(api.Lgr, resp.Results.Results, cleanedTitle, threshold)
@@ -112,10 +112,10 @@ func (api *LinksApi) getIDiTunes(ctx context.Context, title string) (string, err
 			}
 		}
 
-		// Если не нашли точное совпадение, логируем результаты для диагностики
+		// If no exact match found, log results for diagnostics
 		api.Lgr.Logf("[INFO] iTunes response for variant [%s]: %d results", variant, len(resp.Results.Results))
 		for j, result := range resp.Results.Results {
-			if j >= 3 { // Логируем только первые 3 результата
+			if j >= 3 { // Log only first 3 results
 				break
 			}
 			api.Lgr.Logf("[DEBUG] result %d: Artist=%s, Album=%s, Kind=%s", j+1, result.ArtistName, result.CollectionName, result.Kind)
@@ -139,40 +139,40 @@ func (api *LinksApi) GetSongLink(ctx context.Context, id string) (*odesli.GetLin
 }
 
 func clearTitle(title string) string {
-	// Удаляем года в скобках
+	// Remove years in parentheses
 	title = cyrillicYearRegexp.ReplaceAllString(title, "")
-	// Удаляем слово "дискография"
+	// Remove word "discography"
 	title = discographyRegexp.ReplaceAllString(title, "")
-	// Удаляем split EP маркировки
+	// Remove split EP markings
 	title = splitEPRegexp.ReplaceAllString(title, "")
-	// Удаляем CD маркировки
+	// Remove CD markings
 	title = cdMarkingRegexp.ReplaceAllString(title, "")
-	// Удаляем остальные суффиксы
+	// Remove remaining suffixes
 	title = unusedSuffixRegexp.ReplaceAllString(title, "")
-	// Убираем лишние пробелы
+	// Trim extra spaces
 	title = strings.TrimSpace(title)
 	return title
 }
 
-// Генерирует варианты поиска для fallback стратегий
+// Generates search variants for fallback strategies
 func generateSearchVariants(title string) []string {
 	variants := []string{title}
 
-	// Вариант без года
+	// Variant without year
 	withoutYear := cyrillicYearRegexp.ReplaceAllString(title, "")
 	withoutYear = strings.TrimSpace(withoutYear)
 	if withoutYear != title && withoutYear != "" {
 		variants = append(variants, withoutYear)
 	}
 
-	// Вариант без дискографии
+	// Variant without discography
 	withoutDiscography := discographyRegexp.ReplaceAllString(title, "")
 	withoutDiscography = strings.TrimSpace(withoutDiscography)
 	if withoutDiscography != title && withoutDiscography != "" {
 		variants = append(variants, withoutDiscography)
 	}
 
-	// Если есть " - ", попробуем только имя артиста
+	// If contains " - ", try only artist name
 	if parts := strings.Split(title, " - "); len(parts) >= 2 {
 		artistOnly := strings.TrimSpace(parts[0])
 		if artistOnly != "" {
@@ -199,7 +199,7 @@ func findCollectionIDFromResultsByTitleWithThreshold(l lgr.L, results []itunes.R
 			continue
 		}
 
-		// Пробуем разные комбинации
+		// Try different combinations
 		variants := []string{
 			item.ArtistName + " - " + item.CollectionName,
 			item.CollectionName,

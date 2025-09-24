@@ -48,7 +48,7 @@ func (p *Publisher) Start(ctx context.Context) error {
 	itemCount := 0
 	startTime := time.Now()
 
-	// Мониторинг канала каждые 5 минут
+	// Monitor channel every 5 minutes
 	monitorTicker := time.NewTicker(5 * time.Minute)
 	defer monitorTicker.Stop()
 
@@ -79,7 +79,7 @@ func (p *Publisher) Start(ctx context.Context) error {
 func (p *Publisher) Stop() {}
 
 func (p *Publisher) publish(ctx context.Context, items []News) error {
-	// Дедупликация: отфильтровать уже отправленные элементы
+	// Deduplication: filter out already sent items
 	var filteredItems []News
 	for _, item := range items {
 		isPosted, err := p.Store.IsPosted(ctx, item.ID)
@@ -134,7 +134,7 @@ func (p *Publisher) publish(ctx context.Context, items []News) error {
 		successCount++
 		p.Lgr.Logf("[INFO] news successfully sent (%d/%d): [%s]", successCount, len(filteredItems), item.Title)
 
-		// Добавляем случайную задержку только если не последний элемент
+		// Add random delay only if not the last item
 		if i < len(filteredItems)-1 {
 			duration := time.Duration(RandBetween(10_000, 1)) * time.Millisecond
 			p.Lgr.Logf("[DEBUG] sleeping %s before next send", duration)
