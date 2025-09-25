@@ -153,6 +153,15 @@ func NewBotAPI(params BotAPIParams) (*BotAPI, error) {
 	}, nil
 }
 
+// SafeInlineButton creates a URL-only inline button that's safe for channel use.
+// This avoids the telebot.v3 bug where InlineQueryChat field is sent even when empty.
+func SafeInlineButton(text, url string) tb.InlineButton {
+	return tb.InlineButton{
+		Text: text,
+		URL:  url,
+	}
+}
+
 func (api *BotAPI) SendNews(ctx context.Context, n News) (int, error) {
 	id, err := api.SendImageByLink(ctx, n.ImageLink)
 	if err != nil {
@@ -164,7 +173,7 @@ func (api *BotAPI) SendNews(ctx context.Context, n News) (int, error) {
 		return 0, fmt.Errorf("failed to encode page link: %w", err)
 	}
 
-	keyboard := [][]tb.InlineButton{{{Text: "Site Page", URL: pageLinkURL}}}
+	keyboard := [][]tb.InlineButton{{SafeInlineButton("Site Page", pageLinkURL)}}
 	for i, s := range n.DownloadLink {
 		l, err := EncodeQuery(s)
 		if err != nil {
@@ -175,10 +184,7 @@ func (api *BotAPI) SendNews(ctx context.Context, n News) (int, error) {
 			continue
 		}
 
-		keyboard[0] = append(keyboard[0], tb.InlineButton{
-			Text: fmt.Sprintf("Download_%d", i),
-			URL:  l,
-		})
+		keyboard[0] = append(keyboard[0], SafeInlineButton(fmt.Sprintf("Download_%d", i), l))
 	}
 
 	text := fmt.Sprintf("%s\n%s", n.Title, n.Text)
@@ -231,7 +237,7 @@ func (api *BotAPI) SendReleaseNews(ctx context.Context, n ReleaseNews) (int, err
 			return id, fmt.Errorf("failed to encode platform link: %w", eErr)
 		}
 
-		rows = append(rows, tb.InlineButton{Text: string(platform), URL: linkURL})
+		rows = append(rows, SafeInlineButton(string(platform), linkURL))
 	}
 
 	sort.Slice(rows, func(i, j int) bool {
