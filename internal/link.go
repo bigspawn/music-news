@@ -73,14 +73,17 @@ func (api *LinksApi) GetLinks(ctx context.Context, title string) (string, map[od
 func (api *LinksApi) getIDiTunes(ctx context.Context, title string) (string, error) {
 	resp, err := api.Itunes.Search(ctx, itunes.SearchRequest{
 		Term:    title,
-		Country: itunes.US,
+		Country: "US",
+		Entity:  itunes.EntityAlbum,
+		Limit:   10,
+		Media:   itunes.MediaTypeMusic,
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("search iTunes: %w", err)
 	}
 
 	if len(resp.Results.Results) == 0 {
-		return "", fmt.Errorf("albums in iTunes not found: title=%s", title)
+		return "", fmt.Errorf("no results from iTunes for %s", title)
 	}
 
 	id, err := findCollectionIDFromResultsByTitle(api.Lgr, resp.Results.Results, title)
@@ -99,7 +102,7 @@ func (api *LinksApi) GetSongLink(ctx context.Context, id string) (*odesli.GetLin
 		Type:        odesli.EntityTypeAlbum,
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get links from odesli: %w", err)
 	}
 	return &resp, nil
 }
@@ -114,9 +117,9 @@ func findCollectionIDFromResultsByTitle(l lgr.L, results []itunes.Result, title 
 	title = strings.ToLower(title)
 	title = clearTitle(title)
 	for _, item := range results {
-		if item.Kind != itunes.KindAlbum {
-			continue
-		}
+		// if item.Kind != itunes.KindAlbum {
+		// continue
+		// }
 		t := item.ArtistName + " - " + item.CollectionName
 		t = clearTitle(t)
 		t = strings.ToLower(t)
