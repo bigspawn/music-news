@@ -69,37 +69,25 @@ func (n *Notifier) Notify(ctx context.Context) error {
 func (n *Notifier) notify(ctx context.Context, item News) error {
 	releaseLink, linksByPlatform, err := n.Links.GetLinks(ctx, item.Title)
 	if err != nil {
-		n.Lgr.Logf("[WARN] failed to get links for [%s]: %v", item.Title, err)
-		// Try to send notification without platform links
-		if releaseLink == "" && len(item.DownloadLink) == 0 {
-			return fmt.Errorf("no links available for [%s]: %w", item.Title, err)
-		}
+		return fmt.Errorf("get links: %w", err)
+	}
 
-		// Use regular notification with download links
-		err = n.BotAPI.SendNews(ctx, item)
-		if err != nil {
-			return fmt.Errorf("send news: %w", err)
-		}
-	} else {
-		links, err := CheckRequiredPlatforms(linksByPlatform)
-		if err != nil {
-			n.Lgr.Logf("[WARN] no required platforms found for [%s]: %v", item.Title, err)
-			// Send regular notification instead of release notification
-			err = n.BotAPI.SendNews(ctx, item)
-			if err != nil {
-				return fmt.Errorf("send news: %w", err)
-			}
-		} else {
-			// Send release notification with platform links
-			err = n.BotAPI.SendReleaseNews(ctx, ReleaseNews{
-				News:          item,
-				ReleaseLink:   releaseLink,
-				PlatformLinks: links,
-			})
-			if err != nil {
-				return fmt.Errorf("send release news: %w", err)
-			}
-		}
+	links, err := CheckRequiredPlatforms(linksByPlatform)
+	if err != nil {
+		return fmt.Errorf("no required platforms found for [%s]: %w", item.Title, err)
+	}
+
+	if len(links) == 0 && releaseLink == "" {
+		return fmt.Errorf("no links available for [%s]", item.Title)
+	}
+
+	err = n.BotAPI.SendReleaseNews(ctx, ReleaseNews{
+		News:          item,
+		ReleaseLink:   releaseLink,
+		PlatformLinks: links,
+	})
+	if err != nil {
+		return fmt.Errorf("send release news: %w", err)
 	}
 
 	if err := n.Store.UpdateNotifyFlag(ctx, item); err != nil {

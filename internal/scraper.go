@@ -46,29 +46,17 @@ func (s *Scraper) Scrape(ctx context.Context) error {
 		return nil
 	}
 
-	s.lgr.Logf("[INFO] %s: parsed %d items from %s", s.name, len(items), s.parser.siteLabel)
-
-	successInserts := 0
 	for i := range items {
 		items[i].ID, err = s.store.Insert(ctx, items[i])
 		if err != nil {
 			s.lgr.Logf("[ERROR] insert to db: %v", err)
 			continue
 		}
-		successInserts++
-		s.lgr.Logf("[DEBUG] %s: inserted item %d/%d: ID=%d, Title=[%s]",
-			s.name, successInserts, len(items), items[i].ID, items[i].Title)
 	}
 
-	if successInserts > 0 {
-		s.lgr.Logf("[INFO] %s: successfully inserted %d/%d items, sending to channel",
-			s.name, successInserts, len(items))
-		go func() {
-			s.ch <- items
-		}()
-	} else {
-		s.lgr.Logf("[INFO] %s: no items to send to channel", s.name)
-	}
+	go func() {
+		s.ch <- items
+	}()
 
 	return nil
 }

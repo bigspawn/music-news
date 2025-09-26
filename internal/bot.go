@@ -51,15 +51,6 @@ func (api RetryableBotApi) SendNews(ctx context.Context, n News) error {
 		_ = api.Delete(ctx, id)
 	}
 
-	// Return image error without fallback
-	var bErr *tb.Error
-	if errors.As(err, &bErr) && bErr.Code == 400 &&
-		(bErr.Message == "wrong type of the web page content" ||
-		 bErr.Message == "failed to get HTTP URL content") {
-		api.Lgr.Logf("[WARN] image failed for [%s]: %v", n.Title, err)
-		return err
-	}
-
 	retryErr := api.retry(ctx, n.Title, err, func() error {
 		return api.SendNews(ctx, n)
 	})
@@ -85,22 +76,13 @@ func (api *RetryableBotApi) SendReleaseNews(ctx context.Context, n ReleaseNews) 
 		return nil
 	}
 
-	if id > 0 {
-		_ = api.Delete(ctx, id)
-	}
-
-	// Return image error without fallback
-	var bErr *tb.Error
-	if errors.As(err, &bErr) && bErr.Code == 400 &&
-		(bErr.Message == "wrong type of the web page content" ||
-		 bErr.Message == "failed to get HTTP URL content") {
-		api.Lgr.Logf("[WARN] release image failed for [%s]: %v", n.Title, err)
-		return err
-	}
-
 	retryErr := api.retry(ctx, n.Title, err, func() error { return api.SendReleaseNews(ctx, n) })
 	if retryErr == nil {
 		return nil
+	}
+
+	if id > 0 {
+		_ = api.Delete(ctx, id)
 	}
 
 	return retryErr
@@ -153,6 +135,15 @@ func NewBotAPI(params BotAPIParams) (*BotAPI, error) {
 	}, nil
 }
 
+// SafeInlineButton creates a URL-only inline button that's safe for channel use.
+// This avoids the telebot.v3 bug where InlineQueryChat field is sent even when empty.
+func SafeInlineButton(text, url string) tb.InlineButton {
+	return tb.InlineButton{
+		Text: text,
+		URL:  url,
+	}
+}
+
 func (api *BotAPI) SendNews(ctx context.Context, n News) (int, error) {
 	id, err := api.SendImageByLink(ctx, n.ImageLink)
 	if err != nil {
@@ -164,7 +155,7 @@ func (api *BotAPI) SendNews(ctx context.Context, n News) (int, error) {
 		return 0, fmt.Errorf("failed to encode page link: %w", err)
 	}
 
-	keyboard := [][]tb.InlineButton{{{Text: "Site Page", URL: pageLinkURL}}}
+	keyboard := [][]tb.InlineButton{{SafeInlineButton("Site Page", pageLinkURL)}}
 	for i, s := range n.DownloadLink {
 		l, err := EncodeQuery(s)
 		if err != nil {
@@ -175,10 +166,7 @@ func (api *BotAPI) SendNews(ctx context.Context, n News) (int, error) {
 			continue
 		}
 
-		keyboard[0] = append(keyboard[0], tb.InlineButton{
-			Text: fmt.Sprintf("Download_%d", i),
-			URL:  l,
-		})
+		keyboard[0] = append(keyboard[0], SafeInlineButton(fmt.Sprintf("Download_%d", i), l))
 	}
 
 	text := fmt.Sprintf("%s\n%s", n.Title, n.Text)
@@ -231,7 +219,7 @@ func (api *BotAPI) SendReleaseNews(ctx context.Context, n ReleaseNews) (int, err
 			return id, fmt.Errorf("failed to encode platform link: %w", eErr)
 		}
 
-		rows = append(rows, tb.InlineButton{Text: string(platform), URL: linkURL})
+		rows = append(rows, SafeInlineButton(string(platform), linkURL))
 	}
 
 	sort.Slice(rows, func(i, j int) bool {
@@ -247,8 +235,6 @@ func (api *BotAPI) SendReleaseNews(ctx context.Context, n ReleaseNews) (int, err
 
 	return msg.ID, nil
 }
-
-
 
 func WaitUntil(ctx context.Context, duration time.Duration) {
 	timer := time.NewTimer(duration)
