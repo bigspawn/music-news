@@ -1,4 +1,4 @@
-FROM golang:1.23 as build
+FROM golang:1.24 as build
 
 ENV GO111MODULE=on
 ENV CGO_ENABLED=1
@@ -7,10 +7,10 @@ ADD . /build
 WORKDIR /build
 
 RUN \
-  cd cmd && go build -o /build/music-news
+    cd cmd && go build -o /build/music-news
 
 
-FROM golang:1.23
+FROM golang:1.24
 
 WORKDIR /srv
 
