@@ -12,13 +12,7 @@ import (
 	"github.com/go-pkgz/lgr"
 )
 
-var (
-	unusedSuffixRegexp = regexp.MustCompile(`\(\d+\)|([\[(][singleSINGLEpP]+[])])|(\s+-\sEP$)|(\s+\[EP\]$)|(\s+\[[^\]]*EP[^\]]*\])|(\s+\[[^\]]*CD[^\]]*\])`)
-	splitEPRegexp      = regexp.MustCompile(`(?i)\s*\[split\s+EP\]\s*`)
-	cdMarkingRegexp    = regexp.MustCompile(`(?i)\s*\[[0-9]*CD\]\s*`)
-	cyrillicYearRegexp = regexp.MustCompile(`\s*\(\d{4}\)\s*$`)
-	discographyRegexp  = regexp.MustCompile(`(?i)\s*-?\s*(дискография|discography)\s*$`)
-)
+var unusedSuffixRegexp = regexp.MustCompile(`\(\d+\)|([\[(][singleSINGLEpP]+[])])|(\s+-\sEP$)|(\s+\[EP\]$)`)
 
 type LinksApiParams struct {
 	Lgr          lgr.L
@@ -77,52 +71,24 @@ func (api *LinksApi) GetLinks(ctx context.Context, title string) (string, map[od
 }
 
 func (api *LinksApi) getIDiTunes(ctx context.Context, title string) (string, error) {
-	cleanedTitle := clearTitle(title)
-	variants := generateSearchVariants(cleanedTitle)
-
-	api.Lgr.Logf("[DEBUG] trying search variants for title [%s]: %v", title, variants)
-
-	// Try each search variant
-	for i, variant := range variants {
-		api.Lgr.Logf("[DEBUG] trying variant %d: %s", i+1, variant)
-
-		resp, err := api.Itunes.Search(ctx, itunes.SearchRequest{
-			Term:    variant,
-			Country: itunes.US,
-		})
-		if err != nil {
-			api.Lgr.Logf("[WARN] iTunes search failed for variant [%s]: %v", variant, err)
-			continue
-		}
-
-		if len(resp.Results.Results) == 0 {
-			api.Lgr.Logf("[DEBUG] no results for variant: %s", variant)
-			continue
-		}
-
-		api.Lgr.Logf("[DEBUG] found %d results for variant [%s]", len(resp.Results.Results), variant)
-
-		// Try with different distance thresholds
-		thresholds := []int{5, 10, 15, 20}
-		for _, threshold := range thresholds {
-			id, err := findCollectionIDFromResultsByTitleWithThreshold(api.Lgr, resp.Results.Results, cleanedTitle, threshold)
-			if err == nil {
-				api.Lgr.Logf("[INFO] found match with threshold %d for variant [%s]: %s", threshold, variant, id)
-				return id, nil
-			}
-		}
-
-		// If no exact match found, log results for diagnostics
-		api.Lgr.Logf("[INFO] iTunes response for variant [%s]: %d results", variant, len(resp.Results.Results))
-		for j, result := range resp.Results.Results {
-			if j >= 3 { // Log only first 3 results
-				break
-			}
-			api.Lgr.Logf("[DEBUG] result %d: Artist=%s, Album=%s, Kind=%s", j+1, result.ArtistName, result.CollectionName, result.Kind)
-		}
+	resp, err := api.Itunes.Search(ctx, itunes.SearchRequest{
+		Term:    title,
+		Country: itunes.US,
+	})
+	if err != nil {
+		return "", err
 	}
 
-	return "", fmt.Errorf("albums in iTunes not found after trying all variants: title=%s", title)
+	if len(resp.Results.Results) == 0 {
+		return "", fmt.Errorf("albums in iTunes not found: title=%s", title)
+	}
+
+	id, err := findCollectionIDFromResultsByTitle(api.Lgr, resp.Results.Results, title)
+	if err != nil {
+		api.Lgr.Logf("[INFO] iTunes response: %v", resp)
+		return "", err
+	}
+	return id, nil
 }
 
 func (api *LinksApi) GetSongLink(ctx context.Context, id string) (*odesli.GetLinksResponse, error) {
@@ -139,94 +105,28 @@ func (api *LinksApi) GetSongLink(ctx context.Context, id string) (*odesli.GetLin
 }
 
 func clearTitle(title string) string {
-	// Remove years in parentheses
-	title = cyrillicYearRegexp.ReplaceAllString(title, "")
-	// Remove word "discography"
-	title = discographyRegexp.ReplaceAllString(title, "")
-	// Remove split EP markings
-	title = splitEPRegexp.ReplaceAllString(title, "")
-	// Remove CD markings
-	title = cdMarkingRegexp.ReplaceAllString(title, "")
-	// Remove remaining suffixes
 	title = unusedSuffixRegexp.ReplaceAllString(title, "")
-	// Trim extra spaces
 	title = strings.TrimSpace(title)
 	return title
 }
 
-// Generates search variants for fallback strategies
-func generateSearchVariants(title string) []string {
-	variants := []string{title}
-
-	// Variant without year
-	withoutYear := cyrillicYearRegexp.ReplaceAllString(title, "")
-	withoutYear = strings.TrimSpace(withoutYear)
-	if withoutYear != title && withoutYear != "" {
-		variants = append(variants, withoutYear)
-	}
-
-	// Variant without discography
-	withoutDiscography := discographyRegexp.ReplaceAllString(title, "")
-	withoutDiscography = strings.TrimSpace(withoutDiscography)
-	if withoutDiscography != title && withoutDiscography != "" {
-		variants = append(variants, withoutDiscography)
-	}
-
-	// If contains " - ", try only artist name
-	if parts := strings.Split(title, " - "); len(parts) >= 2 {
-		artistOnly := strings.TrimSpace(parts[0])
-		if artistOnly != "" {
-			variants = append(variants, artistOnly)
-		}
-	}
-
-	return variants
-}
-
 func findCollectionIDFromResultsByTitle(l lgr.L, results []itunes.Result, title string) (string, error) {
-	return findCollectionIDFromResultsByTitleWithThreshold(l, results, title, 10)
-}
-
-func findCollectionIDFromResultsByTitleWithThreshold(l lgr.L, results []itunes.Result, title string, threshold int) (string, error) {
 	title = strings.ToLower(title)
 	title = clearTitle(title)
-
-	bestMatch := ""
-	bestDistance := threshold + 1
-
 	for _, item := range results {
 		if item.Kind != itunes.KindAlbum {
 			continue
 		}
-
-		// Try different combinations
-		variants := []string{
-			item.ArtistName + " - " + item.CollectionName,
-			item.CollectionName,
-			item.ArtistName,
+		t := item.ArtistName + " - " + item.CollectionName
+		t = clearTitle(t)
+		t = strings.ToLower(t)
+		n := levenshteinDistance(t, title)
+		if n <= 10 {
+			return strconv.Itoa(item.CollectionId), nil
 		}
-
-		for _, variant := range variants {
-			t := clearTitle(variant)
-			t = strings.ToLower(t)
-			distance := levenshteinDistance(t, title)
-
-			l.Logf("[DEBUG] comparing [%s] with [%s] = distance %d", t, title, distance)
-
-			if distance <= threshold && distance < bestDistance {
-				bestDistance = distance
-				bestMatch = strconv.Itoa(item.CollectionId)
-				l.Logf("[DEBUG] new best match: distance=%d, id=%s", distance, bestMatch)
-			}
-		}
+		l.Logf("[INFO] levenshteinDistance(%s, %s) = %d", t, title, n)
 	}
-
-	if bestMatch != "" {
-		l.Logf("[INFO] found best match with distance %d", bestDistance)
-		return bestMatch, nil
-	}
-
-	return "", fmt.Errorf("albums in iTunes not found with threshold %d: title=%s", threshold, title)
+	return "", fmt.Errorf("albums in iTunes not found: title=%s", title)
 }
 
 func levenshteinDistance(s1, s2 string) int {
