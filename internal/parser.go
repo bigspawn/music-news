@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/go-pkgz/lgr"
@@ -11,7 +12,48 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+// bbCodeTags lists known BBCode tags to strip from titles.
+var bbCodeTags = []string{"bb", "b", "i", "u", "s", "url", "img", "color", "size", "quote", "code"}
+
+func stripBBCode(s string) string {
+	for _, tag := range bbCodeTags {
+		open := "[" + tag + "]"
+		close := "[/" + tag + "]"
+		if strings.Contains(s, open) && strings.Contains(s, close) {
+			s = strings.ReplaceAll(s, open, "")
+			s = strings.ReplaceAll(s, close, "")
+		}
+	}
+	return strings.TrimSpace(s)
+}
+
 const siteLabel = "site"
+
+var skipTitlePatterns = []string{
+	"discography",
+	"дискография",
+	"лучшие альбомы",
+	"итоги",
+	"best of",
+	"va -",
+	"v.a. -",
+	"v/a -",
+	"various artists",
+	"compilation",
+	"сборник",
+	"top albums",
+	"top releases",
+}
+
+func shouldSkipTitle(title string) bool {
+	lower := strings.ToLower(title)
+	for _, p := range skipTitlePatterns {
+		if strings.Contains(lower, p) {
+			return true
+		}
+	}
+	return false
+}
 
 var errorCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Namespace: "music_news",
@@ -48,6 +90,13 @@ func (p *Parser) Parse(ctx context.Context) ([]News, error) {
 	news := make([]News, 0, len(feed.Items))
 	for _, item := range feed.Items {
 		if item == nil {
+			continue
+		}
+
+		item.Title = stripBBCode(item.Title)
+
+		if shouldSkipTitle(item.Title) {
+			p.lgr.Logf("[INFO] skip non-release title: %s", item.Title)
 			continue
 		}
 

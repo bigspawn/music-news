@@ -43,6 +43,14 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 		return nil, fmt.Errorf("failed to create odesli api client: %w", err)
 	}
 
+	var spotifyApi *SpotifyApi
+	if opt.SpotifyClientID != "" {
+		spotifyApi, err = NewSpotifyApi(lgr, opt.SpotifyClientID, opt.SpotifyClientSecret)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create spotify api: %w", err)
+		}
+	}
+
 	links, err := NewLinksApi(LinksApiParams{
 		Lgr:          lgr,
 		ITunesClient: itunesAPI,
@@ -51,6 +59,7 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create links api: %w", err)
 	}
+	links.Spotify = spotifyApi
 
 	store, err := NewStore(StoreParams{
 		Lgr: lgr,
@@ -70,15 +79,15 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 	}
 
 	scheduler := gocron.NewScheduler(time.UTC)
+	httpClient := NewHttpClient(NewDialer())
 
-	_, err = createNotifier(ctx, lgr, opt, bot, store, links, scheduler)
+	_, err = createNotifier(ctx, lgr, opt, bot, store, links, httpClient, scheduler)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create notifier: %w", err)
 	}
 
 	var (
 		ch            = make(chan []News)
-		httpClient    = NewHttpClient(NewDialer())
 		reNotifiedJob *ReNotifiedJob
 	)
 
@@ -99,7 +108,7 @@ func NewApp(ctx context.Context, opt *Options, lgr lgr.L) (*App, error) {
 		// 	return nil, fmt.Errorf("failed to run get rock music scraper: %w", err)
 		// }
 
-		_, err = createPublisher(ctx, lgr, store, bot, opt, ch)
+		_, err = createPublisher(ctx, lgr, store, bot, opt, httpClient, ch)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create publisher: %w", err)
 		}
@@ -145,11 +154,14 @@ func createNotifier(
 	bot *tb.Bot,
 	store *Store,
 	links *LinksApi,
+	httpClient *http.Client,
 	scheduler *gocron.Scheduler,
 ) (*Notifier, error) {
 	notifyBot, err := NewBotAPI(BotAPIParams{
-		Bot:     bot,
-		ChantID: tb.ChatID(opt.NotifierChatID),
+		Lgr:        lgr,
+		Bot:        bot,
+		ChantID:    tb.ChatID(opt.NotifierChatID),
+		HTTPClient: httpClient,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bot api: %w", err)
@@ -368,11 +380,14 @@ func createPublisher(
 	store *Store,
 	bot *tb.Bot,
 	opt *Options,
+	httpClient *http.Client,
 	ch chan []News,
 ) (*Publisher, error) {
 	notifyBot, err := NewBotAPI(BotAPIParams{
-		Bot:     bot,
-		ChantID: tb.ChatID(opt.NewsChatID),
+		Lgr:        lgr,
+		Bot:        bot,
+		ChantID:    tb.ChatID(opt.NewsChatID),
+		HTTPClient: httpClient,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bot api: %w", err)

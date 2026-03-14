@@ -12,7 +12,34 @@ import (
 	"github.com/go-pkgz/lgr"
 )
 
-var unusedSuffixRegexp = regexp.MustCompile(`\(\d+\)|([\[(][singleSINGLEpP]+[])])|(\s+-\sEP$)|(\s+\[EP\]$)`)
+var unusedSuffixRegexp = regexp.MustCompile(`(?i)` +
+	`\(\d{4}\)` + // (2020)
+	`|[\[(]single[)\]]` + // [Single] or (Single)
+	`|\s+\[EP\]` + // [EP]
+	`|\(EP\)` + // (EP)
+	`|\s+-\s+EP(?:\s|$)` + // - EP (at end or before space)
+	`|\s+-\s+Single(?:\s|$)` + // - Single (iTunes format)
+	`|\(Bonus Track Version\)` +
+	`|\(Deluxe Version\)` +
+	`|\(Deluxe Edition\)` +
+	`|\(Deluxe\)` +
+	`|\[Deluxe Edition\]` +
+	`|\[Deluxe\]` +
+	`|\[Deluxe Version\]` +
+	`|\(Remastered\)` +
+	`|\[Remastered\]` +
+	`|\(Remaster\)` +
+	`|\(Special Edition\)` +
+	`|\[Special Edition\]` +
+	`|\(Expanded Edition\)` +
+	`|\[Expanded Edition\]` +
+	`|\[Self-titled\]` + // [Self-titled]
+	`|\(Remixed\s*&\s*Remastered\s*\d{4}\)` + // (Remixed & Remastered 2026)
+	`|\(\d{4}\s+Remixed\s+and\s+Remastered\s+Version\)` + // (2026 Remixed and Remastered Version)
+	`|\[DJ Mix\]` + // [DJ Mix]
+	`|\(feat\.[^)]*\)` + // (feat. Artist Name)
+	`|\s+\([A-Z]{2}\)`, // (US), (UK) country codes
+)
 
 type LinksApiParams struct {
 	Lgr          lgr.L
@@ -33,10 +60,15 @@ func (p *LinksApiParams) Validate() error {
 	return nil
 }
 
+type spotifySearcher interface {
+	SearchAlbumURL(ctx context.Context, artist, album string) (string, error)
+}
+
 type LinksApi struct {
-	Lgr    lgr.L
-	Itunes itunes.API
-	Odesli odesli.API
+	Lgr     lgr.L
+	Itunes  itunes.API
+	Odesli  odesli.API
+	Spotify spotifySearcher
 }
 
 func NewLinksApi(params LinksApiParams) (*LinksApi, error) {
@@ -51,44 +83,66 @@ func NewLinksApi(params LinksApiParams) (*LinksApi, error) {
 }
 
 func (api *LinksApi) GetLinks(ctx context.Context, title string) (string, map[odesli.Platform]string, error) {
-	id, err := api.getIDiTunes(ctx, clearTitle(title))
-	if err != nil {
-		return "", nil, fmt.Errorf("get itunes id for %s: %w", title, err)
-	}
+	searchTitle := clearTitle(title)
 
-	resp, err := api.GetSongLink(ctx, id)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to get links for %s: %w", title, err)
+	// Try iTunes US first.
+	id, err := api.getIDiTunes(ctx, searchTitle)
+	if err == nil {
+		resp, oErr := api.GetSongLink(ctx, id)
+		if oErr != nil {
+			return "", nil, fmt.Errorf("failed to get links for %s: %w", title, oErr)
+		}
+		links := extractLinks(resp)
+		api.supplementSpotifyLink(ctx, links, searchTitle, title)
+		return resp.PageUrl, links, nil
 	}
+	api.Lgr.Logf("[DEBUG] iTunes search failed for %s: %v", title, err)
 
-	links := make(map[odesli.Platform]string, len(resp.LinksByPlatform))
-	for p, l := range resp.LinksByPlatform {
-		if l.Url != "" {
-			links[p] = l.Url
+	// Spotify fallback → Odesli by URL.
+	if api.Spotify != nil {
+		artist, album := splitArtistAlbum(searchTitle)
+		if artist != "" && album != "" {
+			spotifyURL, sErr := api.Spotify.SearchAlbumURL(ctx, artist, album)
+			if sErr != nil {
+				api.Lgr.Logf("[DEBUG] Spotify fallback search failed for %s: %v", title, sErr)
+			} else if spotifyURL != "" {
+				resp, oErr := api.GetSongLinkByURL(ctx, spotifyURL)
+				if oErr != nil {
+					return "", nil, fmt.Errorf("failed to get links via Spotify URL for %s: %w", title, oErr)
+				}
+				links := extractLinks(resp)
+				api.Lgr.Logf("[INFO] links resolved via Spotify fallback for %s", title)
+				return resp.PageUrl, links, nil
+			}
 		}
 	}
-	return resp.PageUrl, links, nil
+
+	return "", nil, fmt.Errorf("no links found for %s: iTunes and Spotify search failed", title)
 }
 
 func (api *LinksApi) getIDiTunes(ctx context.Context, title string) (string, error) {
+	return api.searchITunesCountry(ctx, title, "US")
+}
+
+func (api *LinksApi) searchITunesCountry(ctx context.Context, title, country string) (string, error) {
 	resp, err := api.Itunes.Search(ctx, itunes.SearchRequest{
 		Term:    title,
-		Country: "US",
+		Country: country,
 		Entity:  itunes.EntityAlbum,
 		Limit:   10,
 		Media:   itunes.MediaTypeMusic,
 	})
 	if err != nil {
-		return "", fmt.Errorf("search iTunes: %w", err)
+		return "", fmt.Errorf("search iTunes country=%s: %w", country, err)
 	}
 
 	if len(resp.Results.Results) == 0 {
-		return "", fmt.Errorf("no results from iTunes for %s", title)
+		return "", fmt.Errorf("no results from iTunes for %s (country=%s)", title, country)
 	}
 
 	id, err := findCollectionIDFromResultsByTitle(api.Lgr, resp.Results.Results, title)
 	if err != nil {
-		api.Lgr.Logf("[INFO] iTunes response: %v", resp)
+		api.Lgr.Logf("[INFO] iTunes response (country=%s): %v", country, resp)
 		return "", err
 	}
 	return id, nil
@@ -107,8 +161,56 @@ func (api *LinksApi) GetSongLink(ctx context.Context, id string) (*odesli.GetLin
 	return &resp, nil
 }
 
+func (api *LinksApi) GetSongLinkByURL(ctx context.Context, url string) (*odesli.GetLinksResponse, error) {
+	resp, err := api.Odesli.GetLinks(ctx, odesli.GetLinksRequest{
+		URL:         url,
+		UserCountry: "US",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get links from odesli by url: %w", err)
+	}
+	return &resp, nil
+}
+
+func extractLinks(resp *odesli.GetLinksResponse) map[odesli.Platform]string {
+	links := make(map[odesli.Platform]string, len(resp.LinksByPlatform))
+	for p, l := range resp.LinksByPlatform {
+		if l.Url != "" {
+			links[p] = l.Url
+		}
+	}
+	return links
+}
+
+func (api *LinksApi) supplementSpotifyLink(ctx context.Context, links map[odesli.Platform]string, searchTitle, title string) {
+	if _, hasSpotify := links[odesli.PlatformSpotify]; hasSpotify {
+		return
+	}
+	if api.Spotify == nil {
+		return
+	}
+	artist, album := splitArtistAlbum(searchTitle)
+	if artist == "" || album == "" {
+		return
+	}
+	spotifyURL, err := api.Spotify.SearchAlbumURL(ctx, artist, album)
+	if err != nil {
+		api.Lgr.Logf("[DEBUG] Spotify supplement search failed for %s: %v", title, err)
+		return
+	}
+	if spotifyURL != "" {
+		links[odesli.PlatformSpotify] = spotifyURL
+		api.Lgr.Logf("[INFO] Spotify link supplemented for %s", title)
+	}
+}
+
+var multipleSpacesRegexp = regexp.MustCompile(`\s{2,}`)
+
 func clearTitle(title string) string {
+	title = strings.ReplaceAll(title, "—", "-")
+	title = strings.ReplaceAll(title, "\u2013", "-") // en-dash
 	title = unusedSuffixRegexp.ReplaceAllString(title, "")
+	title = multipleSpacesRegexp.ReplaceAllString(title, " ")
 	title = strings.TrimSpace(title)
 	return title
 }
@@ -124,7 +226,7 @@ func findCollectionIDFromResultsByTitle(l lgr.L, results []itunes.Result, title 
 		t = clearTitle(t)
 		t = strings.ToLower(t)
 		n := levenshteinDistance(t, title)
-		if n <= 10 {
+		if n <= 15 {
 			return strconv.Itoa(item.CollectionId), nil
 		}
 		l.Logf("[INFO] levenshteinDistance(%s, %s) = %d", t, title, n)
@@ -180,4 +282,12 @@ func min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func splitArtistAlbum(title string) (artist, album string) {
+	parts := strings.SplitN(title, " - ", 2)
+	if len(parts) != 2 {
+		return "", ""
+	}
+	return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
 }

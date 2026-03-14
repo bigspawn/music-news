@@ -7,10 +7,181 @@ import (
 	"time"
 
 	itunes "github.com/bigspawn/go-itunes-api"
+	odesli "github.com/bigspawn/go-odesli"
 	"github.com/go-pkgz/lgr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// mock implementations for testing
+
+type mockITunesAPI struct {
+	searchFn func(ctx context.Context, r itunes.SearchRequest) (itunes.SearchResponse, error)
+}
+
+func (m *mockITunesAPI) Search(ctx context.Context, r itunes.SearchRequest) (itunes.SearchResponse, error) {
+	return m.searchFn(ctx, r)
+}
+
+func (m *mockITunesAPI) Lookup(_ context.Context, _ itunes.LookupRequest) (itunes.LookupResponse, error) {
+	return itunes.LookupResponse{}, nil
+}
+
+type mockOdesliAPI struct {
+	getLinksFn func(ctx context.Context, req odesli.GetLinksRequest) (odesli.GetLinksResponse, error)
+}
+
+func (m *mockOdesliAPI) GetLinks(ctx context.Context, req odesli.GetLinksRequest) (odesli.GetLinksResponse, error) {
+	return m.getLinksFn(ctx, req)
+}
+
+type mockSpotifySearcher struct {
+	searchAlbumURLFn func(ctx context.Context, artist, album string) (string, error)
+}
+
+func (m *mockSpotifySearcher) SearchAlbumURL(ctx context.Context, artist, album string) (string, error) {
+	return m.searchAlbumURLFn(ctx, artist, album)
+}
+
+func TestGetLinks_iTunesFound(t *testing.T) {
+	itunesMock := &mockITunesAPI{
+		searchFn: func(_ context.Context, r itunes.SearchRequest) (itunes.SearchResponse, error) {
+			assert.Equal(t, "US", r.Country)
+			return itunes.SearchResponse{
+				Results: itunes.Results{
+					Results: []itunes.Result{
+						{ArtistName: "Parkway Drive", CollectionName: "Horizons", CollectionId: 12345},
+					},
+				},
+			}, nil
+		},
+	}
+	odesliMock := &mockOdesliAPI{
+		getLinksFn: func(_ context.Context, req odesli.GetLinksRequest) (odesli.GetLinksResponse, error) {
+			assert.Equal(t, "12345", req.ID)
+			return odesli.GetLinksResponse{
+				PageUrl: "https://song.link/test",
+				LinksByPlatform: map[odesli.Platform]odesli.LinkByPlatform{
+					odesli.PlatformItunes:  {Url: "https://itunes.apple.com/test"},
+					odesli.PlatformSpotify: {Url: "https://open.spotify.com/test"},
+				},
+			}, nil
+		},
+	}
+
+	api := &LinksApi{Lgr: lgr.Default(), Itunes: itunesMock, Odesli: odesliMock}
+	pageURL, links, err := api.GetLinks(context.Background(), "Parkway Drive - Horizons (2020)")
+
+	require.NoError(t, err)
+	assert.Equal(t, "https://song.link/test", pageURL)
+	assert.Equal(t, "https://itunes.apple.com/test", links[odesli.PlatformItunes])
+	assert.Equal(t, "https://open.spotify.com/test", links[odesli.PlatformSpotify])
+}
+
+func TestGetLinks_iTunesFails_SpotifyFallback(t *testing.T) {
+	itunesMock := &mockITunesAPI{
+		searchFn: func(_ context.Context, _ itunes.SearchRequest) (itunes.SearchResponse, error) {
+			return itunes.SearchResponse{}, fmt.Errorf("not found")
+		},
+	}
+	odesliMock := &mockOdesliAPI{
+		getLinksFn: func(_ context.Context, req odesli.GetLinksRequest) (odesli.GetLinksResponse, error) {
+			assert.Equal(t, "https://open.spotify.com/album/abc", req.URL)
+			return odesli.GetLinksResponse{
+				PageUrl: "https://song.link/spotify-resolved",
+				LinksByPlatform: map[odesli.Platform]odesli.LinkByPlatform{
+					odesli.PlatformSpotify: {Url: "https://open.spotify.com/album/abc"},
+					odesli.PlatformItunes:  {Url: "https://itunes.apple.com/resolved"},
+				},
+			}, nil
+		},
+	}
+	spotifyMock := &mockSpotifySearcher{
+		searchAlbumURLFn: func(_ context.Context, artist, album string) (string, error) {
+			assert.Equal(t, "All Get Out", artist)
+			assert.Equal(t, "Side A", album)
+			return "https://open.spotify.com/album/abc", nil
+		},
+	}
+
+	api := &LinksApi{Lgr: lgr.Default(), Itunes: itunesMock, Odesli: odesliMock, Spotify: spotifyMock}
+	pageURL, links, err := api.GetLinks(context.Background(), "All Get Out - Side A (2020)")
+
+	require.NoError(t, err)
+	assert.Equal(t, "https://song.link/spotify-resolved", pageURL)
+	assert.Equal(t, "https://open.spotify.com/album/abc", links[odesli.PlatformSpotify])
+	assert.Equal(t, "https://itunes.apple.com/resolved", links[odesli.PlatformItunes])
+}
+
+func TestGetLinks_iTunesFails_SpotifyFails_Error(t *testing.T) {
+	itunesMock := &mockITunesAPI{
+		searchFn: func(_ context.Context, _ itunes.SearchRequest) (itunes.SearchResponse, error) {
+			return itunes.SearchResponse{}, fmt.Errorf("not found")
+		},
+	}
+	spotifyMock := &mockSpotifySearcher{
+		searchAlbumURLFn: func(_ context.Context, _, _ string) (string, error) {
+			return "", fmt.Errorf("spotify error")
+		},
+	}
+
+	api := &LinksApi{Lgr: lgr.Default(), Itunes: itunesMock, Odesli: &mockOdesliAPI{}, Spotify: spotifyMock}
+	_, _, err := api.GetLinks(context.Background(), "Unknown Band - Unknown Album (2020)")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no links found")
+}
+
+func TestGetLinks_iTunesFails_SpotifyNil_Error(t *testing.T) {
+	itunesMock := &mockITunesAPI{
+		searchFn: func(_ context.Context, _ itunes.SearchRequest) (itunes.SearchResponse, error) {
+			return itunes.SearchResponse{}, fmt.Errorf("not found")
+		},
+	}
+
+	api := &LinksApi{Lgr: lgr.Default(), Itunes: itunesMock, Odesli: &mockOdesliAPI{}}
+	_, _, err := api.GetLinks(context.Background(), "Unknown Band - Unknown Album (2020)")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no links found")
+}
+
+func TestGetLinks_iTunesFound_NoSpotifyInOdesli_Supplement(t *testing.T) {
+	itunesMock := &mockITunesAPI{
+		searchFn: func(_ context.Context, _ itunes.SearchRequest) (itunes.SearchResponse, error) {
+			return itunes.SearchResponse{
+				Results: itunes.Results{
+					Results: []itunes.Result{
+						{ArtistName: "Parkway Drive", CollectionName: "Horizons", CollectionId: 12345},
+					},
+				},
+			}, nil
+		},
+	}
+	odesliMock := &mockOdesliAPI{
+		getLinksFn: func(_ context.Context, _ odesli.GetLinksRequest) (odesli.GetLinksResponse, error) {
+			return odesli.GetLinksResponse{
+				PageUrl: "https://song.link/test",
+				LinksByPlatform: map[odesli.Platform]odesli.LinkByPlatform{
+					odesli.PlatformItunes: {Url: "https://itunes.apple.com/test"},
+				},
+			}, nil
+		},
+	}
+	spotifyMock := &mockSpotifySearcher{
+		searchAlbumURLFn: func(_ context.Context, _, _ string) (string, error) {
+			return "https://open.spotify.com/album/supplemented", nil
+		},
+	}
+
+	api := &LinksApi{Lgr: lgr.Default(), Itunes: itunesMock, Odesli: odesliMock, Spotify: spotifyMock}
+	pageURL, links, err := api.GetLinks(context.Background(), "Parkway Drive - Horizons (2020)")
+
+	require.NoError(t, err)
+	assert.Equal(t, "https://song.link/test", pageURL)
+	assert.Equal(t, "https://itunes.apple.com/test", links[odesli.PlatformItunes])
+	assert.Equal(t, "https://open.spotify.com/album/supplemented", links[odesli.PlatformSpotify])
+}
 
 func Test_clearTitle(t *testing.T) {
 	tests := []struct {
@@ -66,9 +237,9 @@ func Test_clearTitle(t *testing.T) {
 		{title: "Vatic - Departure [Single] (2020)", want: "Vatic - Departure"},
 		{title: "Glass Tides - Sew Your Mouth Shut [Single] (2020)", want: "Glass Tides - Sew Your Mouth Shut"},
 		{title: "The Motion Below - Truth Hurts [Single] (2020)", want: "The Motion Below - Truth Hurts"},
-		{title: "Of Colors (feat. Dennis Landt) - Bleak [Single] (2020)", want: "Of Colors (feat. Dennis Landt) - Bleak"},
+		{title: "Of Colors (feat. Dennis Landt) - Bleak [Single] (2020)", want: "Of Colors - Bleak"},
 		{title: "Relent - LOW [Single] (2020)", want: "Relent - LOW"},
-		{title: "Fractures and Outlines - Kerosene (feat. Jericho Spencer-Champagne) [Single] (2020)", want: "Fractures and Outlines - Kerosene (feat. Jericho Spencer-Champagne)"},
+		{title: "Fractures and Outlines - Kerosene (feat. Jericho Spencer-Champagne) [Single] (2020)", want: "Fractures and Outlines - Kerosene"},
 		{title: "Chasing Apparitions - As Above, So Below [Single] (2020)", want: "Chasing Apparitions - As Above, So Below"},
 		{title: "Butch Walker - American Love Story (2020)", want: "Butch Walker - American Love Story"},
 		{title: "Blacklab - Abyss (2020)", want: "Blacklab - Abyss"},
@@ -79,6 +250,31 @@ func Test_clearTitle(t *testing.T) {
 		{title: "Agriculture - Agriculture (2023)", want: "Agriculture - Agriculture"},
 		{title: "Who Will Fix Me Now? - EP", want: "Who Will Fix Me Now?"},
 		{title: "Who Will Fix Me Now - EP? - EP", want: "Who Will Fix Me Now - EP?"},
+		// iTunes suffixes
+		{title: "Whitechapel - A New Era of Corruption (Bonus Track Version)", want: "Whitechapel - A New Era of Corruption"},
+		{title: "Parkway Drive - Horizons (Deluxe Edition)", want: "Parkway Drive - Horizons"},
+		{title: "Trivium - Shogun (Special Edition)", want: "Trivium - Shogun"},
+		{title: "Architects - Holy Hell (Deluxe Version)", want: "Architects - Holy Hell"},
+		{title: "Gojira - Fortitude (Remastered)", want: "Gojira - Fortitude"},
+		{title: "Metallica - Master of Puppets [Remastered]", want: "Metallica - Master of Puppets"},
+		{title: "Spiritbox - Eternal Blue (Deluxe)", want: "Spiritbox - Eternal Blue"},
+		{title: "Knocked Loose - A Different Shade of Blue [Deluxe Edition]", want: "Knocked Loose - A Different Shade of Blue"},
+		// em-dash normalization
+		{title: "Crossfire — I Drew A Heart (2024)", want: "Crossfire - I Drew A Heart"},
+		{title: "Slow Degrade \u2013 Who Will Fix Me Now? [EP] (2024)", want: "Slow Degrade - Who Will Fix Me Now?"},
+		// from prod logs: country codes
+		{title: "Crossfire (US) - I Drew A Heart Around The Name Of Your City [EP] (2026)", want: "Crossfire - I Drew A Heart Around The Name Of Your City"},
+		// from prod logs: [Self-titled]
+		{title: "Machinae Supremacy - Machinae Supremacy [Self-titled] (2026)", want: "Machinae Supremacy - Machinae Supremacy"},
+		// from prod logs: (Remixed & Remastered YYYY)
+		{title: "Eventide - Planet Plague (Remixed & Remastered 2026)", want: "Eventide - Planet Plague"},
+		// from prod logs: iTunes (YYYY Remixed and Remastered Version) - EP [DJ Mix]
+		{title: "Planet Plague (2026 Remixed and Remastered Version) - EP [DJ Mix]", want: "Planet Plague"},
+		// from prod logs: (feat. ...) in iTunes results
+		{title: "Forced to Bleed - Forced to Bleed (feat. Jared Armitage)", want: "Forced to Bleed - Forced to Bleed"},
+		// from prod logs: - Single in iTunes results
+		{title: "My Chemical Romance - Number Three - Single", want: "My Chemical Romance - Number Three"},
+		{title: "Rob Zombie - Helter Skelter (feat. Marilyn Manson) - Single", want: "Rob Zombie - Helter Skelter"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.title, func(t *testing.T) {
@@ -173,6 +369,84 @@ func Test_levenshteinDistance(t *testing.T) {
 	}
 }
 
+func Test_shouldSkipTitle(t *testing.T) {
+	tests := []struct {
+		title string
+		want  bool
+	}{
+		{title: "Whitechapel - A New Era of Corruption (2020)", want: false},
+		{title: "Лучшие альбомы 2025 года. Итоги", want: true},
+		{title: "Evil Not Alone - Discography (2005-2026)", want: true},
+		{title: "VA - Alterportal HITS", want: true},
+		{title: "V.A. - Best Metal Collection 2025", want: true},
+		{title: "V/A - Rock Compilation", want: true},
+		{title: "Various Artists - Summer Hits 2025", want: true},
+		{title: "Best of 2025 Rock", want: true},
+		{title: "Сборник рок-хитов 2025", want: true},
+		{title: "Parkway Drive - Horizons (2020)", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.title, func(t *testing.T) {
+			if got := shouldSkipTitle(tt.title); got != tt.want {
+				t.Errorf("shouldSkipTitle() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_stripBBCode(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		// paired BBCode tags — should be stripped
+		{input: "[bb]Valérie Chantraine[/bb] - Album (2026)", want: "Valérie Chantraine - Album (2026)"},
+		{input: "[b]Bold Artist[/b] - Title", want: "Bold Artist - Title"},
+		{input: "[i]Italic[/i] - [b]Bold[/b]", want: "Italic - Bold"},
+		{input: "[bb][/bb]", want: ""},
+		{input: "  [bb]Spaced[/bb]  ", want: "Spaced"},
+		// no BBCode — unchanged
+		{input: "No BBCode Here - Album (2020)", want: "No BBCode Here - Album (2020)"},
+		{input: "", want: ""},
+		// music markers must NOT be removed (no closing pair)
+		{input: "Band - Album [EP] (2020)", want: "Band - Album [EP] (2020)"},
+		{input: "Band - Song [Single] (2020)", want: "Band - Song [Single] (2020)"},
+		{input: "Band - Album [Deluxe Edition] (2020)", want: "Band - Album [Deluxe Edition] (2020)"},
+		{input: "Band - Album [Remastered] (2020)", want: "Band - Album [Remastered] (2020)"},
+		{input: "Band - Album [Self-titled] (2020)", want: "Band - Album [Self-titled] (2020)"},
+		{input: "Band - Album [DJ Mix] (2020)", want: "Band - Album [DJ Mix] (2020)"},
+		{input: "Band - Album [New Track] (2020)", want: "Band - Album [New Track] (2020)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := stripBBCode(tt.input)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func Test_splitArtistAlbum(t *testing.T) {
+	tests := []struct {
+		title      string
+		wantArtist string
+		wantAlbum  string
+	}{
+		{title: "Whitechapel - A New Era of Corruption", wantArtist: "Whitechapel", wantAlbum: "A New Era of Corruption"},
+		{title: "Parkway Drive - Horizons", wantArtist: "Parkway Drive", wantAlbum: "Horizons"},
+		{title: "Single Word", wantArtist: "", wantAlbum: ""},
+		{title: "", wantArtist: "", wantAlbum: ""},
+		{title: "A - B - C", wantArtist: "A", wantAlbum: "B - C"},
+		{title: "  Artist  -  Album  ", wantArtist: "Artist", wantAlbum: "Album"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.title, func(t *testing.T) {
+			artist, album := splitArtistAlbum(tt.title)
+			assert.Equal(t, tt.wantArtist, artist)
+			assert.Equal(t, tt.wantAlbum, album)
+		})
+	}
+}
+
 func Test_findCollectionIDFromResultsByTitle(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -195,6 +469,32 @@ func Test_findCollectionIDFromResultsByTitle(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name: "Bonus Track Version match",
+			r: itunes.Result{
+				ArtistName:     "Whitechapel",
+				CollectionName: "A New Era of Corruption (Bonus Track Version)",
+				ReleaseDate:    time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   456,
+				Kind:           itunes.KindAlbum,
+			},
+			s:        "Whitechapel - A New Era of Corruption (2010)",
+			expected: "456",
+			wantErr:  false,
+		},
+		{
+			name: "em-dash title match",
+			r: itunes.Result{
+				ArtistName:     "Crossfire",
+				CollectionName: "I Drew A Heart",
+				ReleaseDate:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   789,
+				Kind:           itunes.KindAlbum,
+			},
+			s:        "Crossfire — I Drew A Heart (2024)",
+			expected: "789",
+			wantErr:  false,
+		},
+		{
 			name: "UPFALL - ARTIFICIAL - EP",
 			r: itunes.Result{
 				ArtistName:     "UPFALL",
@@ -205,6 +505,58 @@ func Test_findCollectionIDFromResultsByTitle(t *testing.T) {
 			},
 			s:        "Upfall - Artificial (EP) (2025)",
 			expected: "123",
+			wantErr:  false,
+		},
+		{
+			name: "country code (US) stripped for matching",
+			r: itunes.Result{
+				ArtistName:     "Crossfire",
+				CollectionName: "I Drew A Heart Around The Name Of Your City - Single",
+				ReleaseDate:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   111,
+				Kind:           itunes.KindAlbum,
+			},
+			s:        "Crossfire (US) - I Drew A Heart Around The Name Of Your City [EP] (2026)",
+			expected: "111",
+			wantErr:  false,
+		},
+		{
+			name: "feat suffix stripped from iTunes result",
+			r: itunes.Result{
+				ArtistName:     "Forced to Bleed",
+				CollectionName: "Forced to Bleed (feat. Jared Armitage)",
+				ReleaseDate:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   222,
+				Kind:           itunes.KindAlbum,
+			},
+			s:        "Forced to Bleed - Forced to Bleed (2026)",
+			expected: "222",
+			wantErr:  false,
+		},
+		{
+			name: "Remixed and Remastered Version from iTunes",
+			r: itunes.Result{
+				ArtistName:     "Eventide",
+				CollectionName: "Planet Plague (2026 Remixed and Remastered Version) - EP [DJ Mix]",
+				ReleaseDate:    time.Date(2008, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   333,
+				Kind:           itunes.KindAlbum,
+			},
+			s:        "Eventide - Planet Plague (Remixed & Remastered 2026)",
+			expected: "333",
+			wantErr:  false,
+		},
+		{
+			name: "Self-titled stripped",
+			r: itunes.Result{
+				ArtistName:     "Machinae Supremacy",
+				CollectionName: "Machinae Supremacy",
+				ReleaseDate:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   444,
+				Kind:           itunes.KindAlbum,
+			},
+			s:        "Machinae Supremacy - Machinae Supremacy [Self-titled] (2026)",
+			expected: "444",
 			wantErr:  false,
 		},
 	}
