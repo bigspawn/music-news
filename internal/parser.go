@@ -12,6 +12,21 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+// bbCodeTags lists known BBCode tags to strip from titles.
+var bbCodeTags = []string{"bb", "b", "i", "u", "s", "url", "img", "color", "size", "quote", "code"}
+
+func stripBBCode(s string) string {
+	for _, tag := range bbCodeTags {
+		open := "[" + tag + "]"
+		close := "[/" + tag + "]"
+		if strings.Contains(s, open) && strings.Contains(s, close) {
+			s = strings.ReplaceAll(s, open, "")
+			s = strings.ReplaceAll(s, close, "")
+		}
+	}
+	return strings.TrimSpace(s)
+}
+
 const siteLabel = "site"
 
 var skipTitlePatterns = []string{
@@ -77,6 +92,8 @@ func (p *Parser) Parse(ctx context.Context) ([]News, error) {
 		if item == nil {
 			continue
 		}
+
+		item.Title = stripBBCode(item.Title)
 
 		if shouldSkipTitle(item.Title) {
 			p.lgr.Logf("[INFO] skip non-release title: %s", item.Title)

@@ -7,10 +7,181 @@ import (
 	"time"
 
 	itunes "github.com/bigspawn/go-itunes-api"
+	odesli "github.com/bigspawn/go-odesli"
 	"github.com/go-pkgz/lgr"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// mock implementations for testing
+
+type mockITunesAPI struct {
+	searchFn func(ctx context.Context, r itunes.SearchRequest) (itunes.SearchResponse, error)
+}
+
+func (m *mockITunesAPI) Search(ctx context.Context, r itunes.SearchRequest) (itunes.SearchResponse, error) {
+	return m.searchFn(ctx, r)
+}
+
+func (m *mockITunesAPI) Lookup(_ context.Context, _ itunes.LookupRequest) (itunes.LookupResponse, error) {
+	return itunes.LookupResponse{}, nil
+}
+
+type mockOdesliAPI struct {
+	getLinksFn func(ctx context.Context, req odesli.GetLinksRequest) (odesli.GetLinksResponse, error)
+}
+
+func (m *mockOdesliAPI) GetLinks(ctx context.Context, req odesli.GetLinksRequest) (odesli.GetLinksResponse, error) {
+	return m.getLinksFn(ctx, req)
+}
+
+type mockSpotifySearcher struct {
+	searchAlbumURLFn func(ctx context.Context, artist, album string) (string, error)
+}
+
+func (m *mockSpotifySearcher) SearchAlbumURL(ctx context.Context, artist, album string) (string, error) {
+	return m.searchAlbumURLFn(ctx, artist, album)
+}
+
+func TestGetLinks_iTunesFound(t *testing.T) {
+	itunesMock := &mockITunesAPI{
+		searchFn: func(_ context.Context, r itunes.SearchRequest) (itunes.SearchResponse, error) {
+			assert.Equal(t, "US", r.Country)
+			return itunes.SearchResponse{
+				Results: itunes.Results{
+					Results: []itunes.Result{
+						{ArtistName: "Parkway Drive", CollectionName: "Horizons", CollectionId: 12345},
+					},
+				},
+			}, nil
+		},
+	}
+	odesliMock := &mockOdesliAPI{
+		getLinksFn: func(_ context.Context, req odesli.GetLinksRequest) (odesli.GetLinksResponse, error) {
+			assert.Equal(t, "12345", req.ID)
+			return odesli.GetLinksResponse{
+				PageUrl: "https://song.link/test",
+				LinksByPlatform: map[odesli.Platform]odesli.LinkByPlatform{
+					odesli.PlatformItunes:  {Url: "https://itunes.apple.com/test"},
+					odesli.PlatformSpotify: {Url: "https://open.spotify.com/test"},
+				},
+			}, nil
+		},
+	}
+
+	api := &LinksApi{Lgr: lgr.Default(), Itunes: itunesMock, Odesli: odesliMock}
+	pageURL, links, err := api.GetLinks(context.Background(), "Parkway Drive - Horizons (2020)")
+
+	require.NoError(t, err)
+	assert.Equal(t, "https://song.link/test", pageURL)
+	assert.Equal(t, "https://itunes.apple.com/test", links[odesli.PlatformItunes])
+	assert.Equal(t, "https://open.spotify.com/test", links[odesli.PlatformSpotify])
+}
+
+func TestGetLinks_iTunesFails_SpotifyFallback(t *testing.T) {
+	itunesMock := &mockITunesAPI{
+		searchFn: func(_ context.Context, _ itunes.SearchRequest) (itunes.SearchResponse, error) {
+			return itunes.SearchResponse{}, fmt.Errorf("not found")
+		},
+	}
+	odesliMock := &mockOdesliAPI{
+		getLinksFn: func(_ context.Context, req odesli.GetLinksRequest) (odesli.GetLinksResponse, error) {
+			assert.Equal(t, "https://open.spotify.com/album/abc", req.URL)
+			return odesli.GetLinksResponse{
+				PageUrl: "https://song.link/spotify-resolved",
+				LinksByPlatform: map[odesli.Platform]odesli.LinkByPlatform{
+					odesli.PlatformSpotify: {Url: "https://open.spotify.com/album/abc"},
+					odesli.PlatformItunes:  {Url: "https://itunes.apple.com/resolved"},
+				},
+			}, nil
+		},
+	}
+	spotifyMock := &mockSpotifySearcher{
+		searchAlbumURLFn: func(_ context.Context, artist, album string) (string, error) {
+			assert.Equal(t, "All Get Out", artist)
+			assert.Equal(t, "Side A", album)
+			return "https://open.spotify.com/album/abc", nil
+		},
+	}
+
+	api := &LinksApi{Lgr: lgr.Default(), Itunes: itunesMock, Odesli: odesliMock, Spotify: spotifyMock}
+	pageURL, links, err := api.GetLinks(context.Background(), "All Get Out - Side A (2020)")
+
+	require.NoError(t, err)
+	assert.Equal(t, "https://song.link/spotify-resolved", pageURL)
+	assert.Equal(t, "https://open.spotify.com/album/abc", links[odesli.PlatformSpotify])
+	assert.Equal(t, "https://itunes.apple.com/resolved", links[odesli.PlatformItunes])
+}
+
+func TestGetLinks_iTunesFails_SpotifyFails_Error(t *testing.T) {
+	itunesMock := &mockITunesAPI{
+		searchFn: func(_ context.Context, _ itunes.SearchRequest) (itunes.SearchResponse, error) {
+			return itunes.SearchResponse{}, fmt.Errorf("not found")
+		},
+	}
+	spotifyMock := &mockSpotifySearcher{
+		searchAlbumURLFn: func(_ context.Context, _, _ string) (string, error) {
+			return "", fmt.Errorf("spotify error")
+		},
+	}
+
+	api := &LinksApi{Lgr: lgr.Default(), Itunes: itunesMock, Odesli: &mockOdesliAPI{}, Spotify: spotifyMock}
+	_, _, err := api.GetLinks(context.Background(), "Unknown Band - Unknown Album (2020)")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no links found")
+}
+
+func TestGetLinks_iTunesFails_SpotifyNil_Error(t *testing.T) {
+	itunesMock := &mockITunesAPI{
+		searchFn: func(_ context.Context, _ itunes.SearchRequest) (itunes.SearchResponse, error) {
+			return itunes.SearchResponse{}, fmt.Errorf("not found")
+		},
+	}
+
+	api := &LinksApi{Lgr: lgr.Default(), Itunes: itunesMock, Odesli: &mockOdesliAPI{}}
+	_, _, err := api.GetLinks(context.Background(), "Unknown Band - Unknown Album (2020)")
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no links found")
+}
+
+func TestGetLinks_iTunesFound_NoSpotifyInOdesli_Supplement(t *testing.T) {
+	itunesMock := &mockITunesAPI{
+		searchFn: func(_ context.Context, _ itunes.SearchRequest) (itunes.SearchResponse, error) {
+			return itunes.SearchResponse{
+				Results: itunes.Results{
+					Results: []itunes.Result{
+						{ArtistName: "Parkway Drive", CollectionName: "Horizons", CollectionId: 12345},
+					},
+				},
+			}, nil
+		},
+	}
+	odesliMock := &mockOdesliAPI{
+		getLinksFn: func(_ context.Context, _ odesli.GetLinksRequest) (odesli.GetLinksResponse, error) {
+			return odesli.GetLinksResponse{
+				PageUrl: "https://song.link/test",
+				LinksByPlatform: map[odesli.Platform]odesli.LinkByPlatform{
+					odesli.PlatformItunes: {Url: "https://itunes.apple.com/test"},
+				},
+			}, nil
+		},
+	}
+	spotifyMock := &mockSpotifySearcher{
+		searchAlbumURLFn: func(_ context.Context, _, _ string) (string, error) {
+			return "https://open.spotify.com/album/supplemented", nil
+		},
+	}
+
+	api := &LinksApi{Lgr: lgr.Default(), Itunes: itunesMock, Odesli: odesliMock, Spotify: spotifyMock}
+	pageURL, links, err := api.GetLinks(context.Background(), "Parkway Drive - Horizons (2020)")
+
+	require.NoError(t, err)
+	assert.Equal(t, "https://song.link/test", pageURL)
+	assert.Equal(t, "https://itunes.apple.com/test", links[odesli.PlatformItunes])
+	assert.Equal(t, "https://open.spotify.com/album/supplemented", links[odesli.PlatformSpotify])
+}
 
 func Test_clearTitle(t *testing.T) {
 	tests := []struct {
@@ -219,6 +390,37 @@ func Test_shouldSkipTitle(t *testing.T) {
 			if got := shouldSkipTitle(tt.title); got != tt.want {
 				t.Errorf("shouldSkipTitle() = %v, want %v", got, tt.want)
 			}
+		})
+	}
+}
+
+func Test_stripBBCode(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		// paired BBCode tags — should be stripped
+		{input: "[bb]Valérie Chantraine[/bb] - Album (2026)", want: "Valérie Chantraine - Album (2026)"},
+		{input: "[b]Bold Artist[/b] - Title", want: "Bold Artist - Title"},
+		{input: "[i]Italic[/i] - [b]Bold[/b]", want: "Italic - Bold"},
+		{input: "[bb][/bb]", want: ""},
+		{input: "  [bb]Spaced[/bb]  ", want: "Spaced"},
+		// no BBCode — unchanged
+		{input: "No BBCode Here - Album (2020)", want: "No BBCode Here - Album (2020)"},
+		{input: "", want: ""},
+		// music markers must NOT be removed (no closing pair)
+		{input: "Band - Album [EP] (2020)", want: "Band - Album [EP] (2020)"},
+		{input: "Band - Song [Single] (2020)", want: "Band - Song [Single] (2020)"},
+		{input: "Band - Album [Deluxe Edition] (2020)", want: "Band - Album [Deluxe Edition] (2020)"},
+		{input: "Band - Album [Remastered] (2020)", want: "Band - Album [Remastered] (2020)"},
+		{input: "Band - Album [Self-titled] (2020)", want: "Band - Album [Self-titled] (2020)"},
+		{input: "Band - Album [DJ Mix] (2020)", want: "Band - Album [DJ Mix] (2020)"},
+		{input: "Band - Album [New Track] (2020)", want: "Band - Album [New Track] (2020)"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := stripBBCode(tt.input)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

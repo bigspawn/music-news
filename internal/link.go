@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	itunes "github.com/bigspawn/go-itunes-api"
 	odesli "github.com/bigspawn/go-odesli"
@@ -61,11 +60,15 @@ func (p *LinksApiParams) Validate() error {
 	return nil
 }
 
+type spotifySearcher interface {
+	SearchAlbumURL(ctx context.Context, artist, album string) (string, error)
+}
+
 type LinksApi struct {
 	Lgr     lgr.L
 	Itunes  itunes.API
 	Odesli  odesli.API
-	Spotify *SpotifyApi
+	Spotify spotifySearcher
 }
 
 func NewLinksApi(params LinksApiParams) (*LinksApi, error) {
@@ -82,58 +85,43 @@ func NewLinksApi(params LinksApiParams) (*LinksApi, error) {
 func (api *LinksApi) GetLinks(ctx context.Context, title string) (string, map[odesli.Platform]string, error) {
 	searchTitle := clearTitle(title)
 
+	// Try iTunes US first.
 	id, err := api.getIDiTunes(ctx, searchTitle)
-	if err != nil {
-		return "", nil, fmt.Errorf("get itunes id for %s: %w", title, err)
-	}
-
-	resp, err := api.GetSongLink(ctx, id)
-	if err != nil {
-		return "", nil, fmt.Errorf("failed to get links for %s: %w", title, err)
-	}
-
-	links := make(map[odesli.Platform]string, len(resp.LinksByPlatform))
-	for p, l := range resp.LinksByPlatform {
-		if l.Url != "" {
-			links[p] = l.Url
+	if err == nil {
+		resp, oErr := api.GetSongLink(ctx, id)
+		if oErr != nil {
+			return "", nil, fmt.Errorf("failed to get links for %s: %w", title, oErr)
 		}
+		links := extractLinks(resp)
+		api.supplementSpotifyLink(ctx, links, searchTitle, title)
+		return resp.PageUrl, links, nil
 	}
+	api.Lgr.Logf("[DEBUG] iTunes search failed for %s: %v", title, err)
 
-	if _, hasSpotify := links[odesli.PlatformSpotify]; !hasSpotify && api.Spotify != nil {
+	// Spotify fallback → Odesli by URL.
+	if api.Spotify != nil {
 		artist, album := splitArtistAlbum(searchTitle)
 		if artist != "" && album != "" {
 			spotifyURL, sErr := api.Spotify.SearchAlbumURL(ctx, artist, album)
 			if sErr != nil {
 				api.Lgr.Logf("[DEBUG] Spotify fallback search failed for %s: %v", title, sErr)
 			} else if spotifyURL != "" {
-				links[odesli.PlatformSpotify] = spotifyURL
-				api.Lgr.Logf("[INFO] Spotify link found via fallback for %s", title)
+				resp, oErr := api.GetSongLinkByURL(ctx, spotifyURL)
+				if oErr != nil {
+					return "", nil, fmt.Errorf("failed to get links via Spotify URL for %s: %w", title, oErr)
+				}
+				links := extractLinks(resp)
+				api.Lgr.Logf("[INFO] links resolved via Spotify fallback for %s", title)
+				return resp.PageUrl, links, nil
 			}
 		}
 	}
 
-	return resp.PageUrl, links, nil
+	return "", nil, fmt.Errorf("no links found for %s: iTunes and Spotify search failed", title)
 }
 
-// fallbackCountries defines the order of iTunes store countries to search.
-// US has the largest catalog, GB is the second largest English-speaking store,
-// DE covers German metal scene, SE covers Scandinavian metal/rock.
-var fallbackCountries = []string{"US", "GB", "DE", "SE"}
-
 func (api *LinksApi) getIDiTunes(ctx context.Context, title string) (string, error) {
-	var lastErr error
-	for i, country := range fallbackCountries {
-		if i > 0 {
-			time.Sleep(3 * time.Second)
-		}
-		id, err := api.searchITunesCountry(ctx, title, country)
-		if err == nil {
-			return id, nil
-		}
-		lastErr = err
-		api.Lgr.Logf("[DEBUG] iTunes search failed for country=%s, title=%s: %v", country, title, err)
-	}
-	return "", fmt.Errorf("search iTunes in all countries: %w", lastErr)
+	return api.searchITunesCountry(ctx, title, "US")
 }
 
 func (api *LinksApi) searchITunesCountry(ctx context.Context, title, country string) (string, error) {
@@ -171,6 +159,49 @@ func (api *LinksApi) GetSongLink(ctx context.Context, id string) (*odesli.GetLin
 		return nil, fmt.Errorf("get links from odesli: %w", err)
 	}
 	return &resp, nil
+}
+
+func (api *LinksApi) GetSongLinkByURL(ctx context.Context, url string) (*odesli.GetLinksResponse, error) {
+	resp, err := api.Odesli.GetLinks(ctx, odesli.GetLinksRequest{
+		URL:         url,
+		UserCountry: "US",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("get links from odesli by url: %w", err)
+	}
+	return &resp, nil
+}
+
+func extractLinks(resp *odesli.GetLinksResponse) map[odesli.Platform]string {
+	links := make(map[odesli.Platform]string, len(resp.LinksByPlatform))
+	for p, l := range resp.LinksByPlatform {
+		if l.Url != "" {
+			links[p] = l.Url
+		}
+	}
+	return links
+}
+
+func (api *LinksApi) supplementSpotifyLink(ctx context.Context, links map[odesli.Platform]string, searchTitle, title string) {
+	if _, hasSpotify := links[odesli.PlatformSpotify]; hasSpotify {
+		return
+	}
+	if api.Spotify == nil {
+		return
+	}
+	artist, album := splitArtistAlbum(searchTitle)
+	if artist == "" || album == "" {
+		return
+	}
+	spotifyURL, err := api.Spotify.SearchAlbumURL(ctx, artist, album)
+	if err != nil {
+		api.Lgr.Logf("[DEBUG] Spotify supplement search failed for %s: %v", title, err)
+		return
+	}
+	if spotifyURL != "" {
+		links[odesli.PlatformSpotify] = spotifyURL
+		api.Lgr.Logf("[INFO] Spotify link supplemented for %s", title)
+	}
 }
 
 var multipleSpacesRegexp = regexp.MustCompile(`\s{2,}`)

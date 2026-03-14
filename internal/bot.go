@@ -18,9 +18,15 @@ import (
 	tb "gopkg.in/telebot.v3"
 )
 
+type botSender interface {
+	SendNews(ctx context.Context, n News) (int, error)
+	SendReleaseNews(ctx context.Context, n ReleaseNews) (int, error)
+	Delete(ctx context.Context, id int) error
+}
+
 type RetryableBotApiParams struct {
 	Lgr lgr.L
-	Bot *BotAPI
+	Bot botSender
 }
 
 func (p *RetryableBotApiParams) Validate() error {
@@ -82,13 +88,13 @@ func (api *RetryableBotApi) SendReleaseNews(ctx context.Context, n ReleaseNews) 
 		return nil
 	}
 
+	if id > 0 {
+		_ = api.Delete(ctx, id)
+	}
+
 	retryErr := api.retry(ctx, n.Title, err, func() error { return api.SendReleaseNews(ctx, n) })
 	if retryErr == nil {
 		return nil
-	}
-
-	if id > 0 {
-		_ = api.Delete(ctx, id)
 	}
 
 	return retryErr

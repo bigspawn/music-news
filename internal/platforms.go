@@ -19,11 +19,10 @@ func CheckRequiredPlatforms(platforms map[goOdesli.Platform]string) (map[goOdesl
 	for _, platform := range requiredPlatforms {
 		if link, ok := platforms[platform]; ok {
 			result[platform] = link
-			continue
 		}
-		if platform == goOdesli.PlatformItunes {
-			return nil, fmt.Errorf("link for platform=%s not found", platform)
-		}
+	}
+	if len(result) == 0 {
+		return nil, fmt.Errorf("no required platforms found")
 	}
 	return result, nil
 }

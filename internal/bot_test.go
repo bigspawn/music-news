@@ -1,15 +1,144 @@
 package internal
 
 import (
+	"bytes"
+	"context"
+	"fmt"
 	"image"
 	"image/color"
 	"image/png"
-	"bytes"
 	"strings"
 	"testing"
 
+	goOdesli "github.com/bigspawn/go-odesli"
+	"github.com/go-pkgz/lgr"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	tb "gopkg.in/telebot.v3"
 )
+
+type mockBotSender struct {
+	sendNewsFn        func(ctx context.Context, n News) (int, error)
+	sendReleaseNewsFn func(ctx context.Context, n ReleaseNews) (int, error)
+	deleteFn          func(ctx context.Context, id int) error
+}
+
+func (m *mockBotSender) SendNews(ctx context.Context, n News) (int, error) {
+	return m.sendNewsFn(ctx, n)
+}
+
+func (m *mockBotSender) SendReleaseNews(ctx context.Context, n ReleaseNews) (int, error) {
+	return m.sendReleaseNewsFn(ctx, n)
+}
+
+func (m *mockBotSender) Delete(ctx context.Context, id int) error {
+	return m.deleteFn(ctx, id)
+}
+
+func TestRetryableSendReleaseNews_FloodError_DeletesImageBeforeRetry(t *testing.T) {
+	callOrder := make([]string, 0)
+	callCount := 0
+
+	mock := &mockBotSender{
+		sendReleaseNewsFn: func(_ context.Context, _ ReleaseNews) (int, error) {
+			callCount++
+			if callCount == 1 {
+				callOrder = append(callOrder, "send_1_image_sent")
+				// Image sent (id=42), text message failed with FloodError
+				return 42, fmt.Errorf("%w", tb.FloodError{RetryAfter: 0})
+			}
+			callOrder = append(callOrder, "send_2_success")
+			return 100, nil
+		},
+		deleteFn: func(_ context.Context, id int) error {
+			callOrder = append(callOrder, fmt.Sprintf("delete_%d", id))
+			return nil
+		},
+	}
+
+	api, err := NewRetryableBotApi(RetryableBotApiParams{
+		Lgr: lgr.Default(),
+		Bot: mock,
+	})
+	require.NoError(t, err)
+
+	n := ReleaseNews{
+		News:          News{Title: "Test - Album"},
+		ReleaseLink:   "https://song.link/test",
+		PlatformLinks: map[goOdesli.Platform]string{goOdesli.PlatformSpotify: "https://spotify.com/test"},
+	}
+
+	err = api.SendReleaseNews(context.Background(), n)
+	require.NoError(t, err)
+
+	// delete must happen BEFORE the retry send
+	require.Equal(t, []string{"send_1_image_sent", "delete_42", "send_2_success"}, callOrder)
+}
+
+func TestRetryableSendReleaseNews_NoFloodError_NoRetry(t *testing.T) {
+	mock := &mockBotSender{
+		sendReleaseNewsFn: func(_ context.Context, _ ReleaseNews) (int, error) {
+			return 100, nil
+		},
+		deleteFn: func(_ context.Context, _ int) error {
+			t.Fatal("delete should not be called on success")
+			return nil
+		},
+	}
+
+	api, err := NewRetryableBotApi(RetryableBotApiParams{Lgr: lgr.Default(), Bot: mock})
+	require.NoError(t, err)
+
+	err = api.SendReleaseNews(context.Background(), ReleaseNews{News: News{Title: "Test"}})
+	require.NoError(t, err)
+}
+
+func TestRetryableSendReleaseNews_NonFloodError_NoRetry(t *testing.T) {
+	mock := &mockBotSender{
+		sendReleaseNewsFn: func(_ context.Context, _ ReleaseNews) (int, error) {
+			return 0, fmt.Errorf("some other error")
+		},
+		deleteFn: func(_ context.Context, _ int) error {
+			t.Fatal("delete should not be called when id=0")
+			return nil
+		},
+	}
+
+	api, err := NewRetryableBotApi(RetryableBotApiParams{Lgr: lgr.Default(), Bot: mock})
+	require.NoError(t, err)
+
+	err = api.SendReleaseNews(context.Background(), ReleaseNews{News: News{Title: "Test"}})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "some other error")
+}
+
+func TestRetryableSendNews_FloodError_DeletesImageBeforeRetry(t *testing.T) {
+	callOrder := make([]string, 0)
+	callCount := 0
+
+	mock := &mockBotSender{
+		sendNewsFn: func(_ context.Context, _ News) (int, error) {
+			callCount++
+			if callCount == 1 {
+				callOrder = append(callOrder, "send_1_image_sent")
+				return 42, fmt.Errorf("%w", tb.FloodError{RetryAfter: 0})
+			}
+			callOrder = append(callOrder, "send_2_success")
+			return 100, nil
+		},
+		deleteFn: func(_ context.Context, id int) error {
+			callOrder = append(callOrder, fmt.Sprintf("delete_%d", id))
+			return nil
+		},
+	}
+
+	api, err := NewRetryableBotApi(RetryableBotApiParams{Lgr: lgr.Default(), Bot: mock})
+	require.NoError(t, err)
+
+	err = api.SendNews(context.Background(), News{Title: "Test"})
+	require.NoError(t, err)
+	require.Equal(t, []string{"send_1_image_sent", "delete_42", "send_2_success"}, callOrder)
+}
 
 func Test_truncateText(t *testing.T) {
 	tests := []struct {
