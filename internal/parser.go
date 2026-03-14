@@ -3,6 +3,7 @@ package internal
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/go-pkgz/lgr"
@@ -12,6 +13,32 @@ import (
 )
 
 const siteLabel = "site"
+
+var skipTitlePatterns = []string{
+	"discography",
+	"дискография",
+	"лучшие альбомы",
+	"итоги",
+	"best of",
+	"va -",
+	"v.a. -",
+	"v/a -",
+	"various artists",
+	"compilation",
+	"сборник",
+	"top albums",
+	"top releases",
+}
+
+func shouldSkipTitle(title string) bool {
+	lower := strings.ToLower(title)
+	for _, p := range skipTitlePatterns {
+		if strings.Contains(lower, p) {
+			return true
+		}
+	}
+	return false
+}
 
 var errorCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Namespace: "music_news",
@@ -48,6 +75,11 @@ func (p *Parser) Parse(ctx context.Context) ([]News, error) {
 	news := make([]News, 0, len(feed.Items))
 	for _, item := range feed.Items {
 		if item == nil {
+			continue
+		}
+
+		if shouldSkipTitle(item.Title) {
+			p.lgr.Logf("[INFO] skip non-release title: %s", item.Title)
 			continue
 		}
 

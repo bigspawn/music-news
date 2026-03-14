@@ -81,42 +81,30 @@ func ParseHtml(ctx context.Context, l lgr.L, news *News, r io.Reader) (*News, er
 
 	var links []string
 	for i := range news.DownloadLink {
-		if !strings.Contains(news.DownloadLink[i], engineSuffix) {
-			l.Logf("[INFO]coreradio: skip wrong link for parser: %s", news.DownloadLink[i])
-			continue
-		}
+		raw := news.DownloadLink[i]
 
-		l.Logf("[DEBUG] coreradio: link: %s\n", news.DownloadLink[i])
-
-		link, err := DecodeBase64(ExtractLink(news.DownloadLink[i]))
-		if err != nil {
-			return nil, fmt.Errorf("coreradio: DecodeBase64: link=%s: %w", news.DownloadLink[i], err)
-		}
-
-		l.Logf("[DEBUG] decoded link: %s\n", link)
-
-		purl, err := url.ParseQuery(link)
-		if err != nil {
-			return nil, fmt.Errorf("coreradio: ParseQuery: link=%s: %w", link, err)
-		}
-
-		l.Logf("[DEBUG] parsed link: %s\n", purl)
-
-		var ll string
 		switch {
-		case purl.Get("url") != "":
-			ll = ExtractAfterDecode(purl.Get("url"))
-		case purl.Get("s") != "":
-			ll = ExtractAfterDecode(purl.Get("s"))
-		default:
-			l.Logf("[INFO] coreradio: skip link: %s\n", link)
-		}
+		case strings.Contains(raw, engineSuffix):
+			ll, err := extractEngineLink(l, raw)
+			if err != nil {
+				return nil, err
+			}
+			if ll != "" {
+				links = append(links, ll)
+			}
 
-		if ll != "" {
-			l.Logf("[DEBUG] coreradio: extracted link: %s\n", ll)
+		case strings.Contains(raw, "get."+coreradioHost):
+			ll, err := extractGetCoreradioLink(raw)
+			if err != nil {
+				l.Logf("[WARN] coreradio: failed to extract get link: %s: %v", raw, err)
+				continue
+			}
+			l.Logf("[DEBUG] coreradio: extracted get link: %s", ll)
 			links = append(links, ll)
-		}
 
+		default:
+			l.Logf("[INFO] coreradio: skip unknown link format: %s", raw)
+		}
 	}
 	news.DownloadLink = links
 
@@ -223,6 +211,65 @@ func ExtractLink(s string) string {
 		return s
 	}
 	return s[idx+slashLen:]
+}
+
+func extractEngineLink(l lgr.L, raw string) (string, error) {
+	l.Logf("[DEBUG] coreradio: link: %s", raw)
+
+	link, err := DecodeBase64(ExtractLink(raw))
+	if err != nil {
+		return "", fmt.Errorf("coreradio: DecodeBase64: link=%s: %w", raw, err)
+	}
+
+	l.Logf("[DEBUG] decoded link: %s", link)
+
+	purl, err := url.ParseQuery(link)
+	if err != nil {
+		return "", fmt.Errorf("coreradio: ParseQuery: link=%s: %w", link, err)
+	}
+
+	l.Logf("[DEBUG] parsed link: %s", purl)
+
+	var ll string
+	switch {
+	case purl.Get("url") != "":
+		ll = ExtractAfterDecode(purl.Get("url"))
+	case purl.Get("s") != "":
+		ll = ExtractAfterDecode(purl.Get("s"))
+	default:
+		l.Logf("[INFO] coreradio: skip link: %s", link)
+		return "", nil
+	}
+
+	if ll != "" {
+		l.Logf("[DEBUG] coreradio: extracted link: %s", ll)
+	}
+	return ll, nil
+}
+
+func extractGetCoreradioLink(rawLink string) (string, error) {
+	u, err := url.Parse(rawLink)
+	if err != nil {
+		return "", fmt.Errorf("parse URL: %w", err)
+	}
+
+	hash := u.Query().Get("hash")
+	if hash == "" {
+		return "", fmt.Errorf("no hash parameter in URL: %s", rawLink)
+	}
+
+	// Double base64 decode: hash → intermediate base64 → final URL
+	intermediate, err := DecodeBase64StdPadding(hash)
+	if err != nil {
+		return "", fmt.Errorf("first base64 decode: %w", err)
+	}
+
+	result, err := DecodeBase64StdPadding(intermediate)
+	if err != nil {
+		return "", fmt.Errorf("second base64 decode: %w", err)
+	}
+
+	return result, nil
 }
 
 func ExtractAfterDecode(s string) string {

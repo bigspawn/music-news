@@ -13,3 +13,4 @@ docker-compose-*.yml.save
 local/run-local.sh
 
 .env*
+/.claude/

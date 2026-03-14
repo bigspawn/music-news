@@ -27,3 +27,4 @@ docker-compose-*.yml.save
 *.sqlite
 local/run-local.sh
 .env*
+/.claude/settings.local.json

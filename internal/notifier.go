@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/go-pkgz/lgr"
 )
@@ -33,6 +34,7 @@ func (p *NotifierParams) Validate() error {
 
 type Notifier struct {
 	NotifierParams
+	mu sync.Mutex
 }
 
 func NewNotifier(params NotifierParams) (*Notifier, error) {
@@ -45,6 +47,12 @@ func NewNotifier(params NotifierParams) (*Notifier, error) {
 }
 
 func (n *Notifier) Notify(ctx context.Context) error {
+	if !n.mu.TryLock() {
+		n.Lgr.Logf("[INFO] notifier already running, skipping")
+		return nil
+	}
+	defer n.mu.Unlock()
+
 	items, err := n.Store.GetWithNotifyFlag(ctx)
 	if err != nil {
 		return err
@@ -57,6 +65,10 @@ func (n *Notifier) Notify(ctx context.Context) error {
 			}
 
 			n.Lgr.Logf("[ERROR] failed notify [%s] cause: %v", item.Title, err)
+
+			if incErr := n.Store.IncrementNotifyAttempts(ctx, item.ID); incErr != nil {
+				n.Lgr.Logf("[ERROR] failed to increment notify attempts [%s]: %v", item.Title, incErr)
+			}
 
 			continue
 		}

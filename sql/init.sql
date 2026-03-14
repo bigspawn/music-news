@@ -26,3 +26,7 @@ create table news
 -- update news n
 -- set created_at = n.date_time
 -- where n.created_at is null;
+
+-- migration: add retry tracking columns for notifier
+-- alter table news add column notify_attempts integer not null default 0;
+-- alter table news add column notify_next_retry timestamp;

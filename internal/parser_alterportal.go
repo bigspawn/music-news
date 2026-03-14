@@ -29,7 +29,9 @@ func (p *AlterPortalParser) Parse(ctx context.Context, item *gofeed.Item) (*News
 	if strings.Contains(item.Link, "raznoe") ||
 		strings.Contains(item.Link, "video") ||
 		strings.Contains(item.Link, "news") ||
-		strings.Contains(item.Link, "neformat") {
+		strings.Contains(item.Link, "neformat") ||
+		strings.Contains(item.Link, "tops") ||
+		strings.Contains(item.Link, "compilation") {
 		return nil, ErrSkipItem
 	}
 

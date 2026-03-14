@@ -66,9 +66,9 @@ func Test_clearTitle(t *testing.T) {
 		{title: "Vatic - Departure [Single] (2020)", want: "Vatic - Departure"},
 		{title: "Glass Tides - Sew Your Mouth Shut [Single] (2020)", want: "Glass Tides - Sew Your Mouth Shut"},
 		{title: "The Motion Below - Truth Hurts [Single] (2020)", want: "The Motion Below - Truth Hurts"},
-		{title: "Of Colors (feat. Dennis Landt) - Bleak [Single] (2020)", want: "Of Colors (feat. Dennis Landt) - Bleak"},
+		{title: "Of Colors (feat. Dennis Landt) - Bleak [Single] (2020)", want: "Of Colors - Bleak"},
 		{title: "Relent - LOW [Single] (2020)", want: "Relent - LOW"},
-		{title: "Fractures and Outlines - Kerosene (feat. Jericho Spencer-Champagne) [Single] (2020)", want: "Fractures and Outlines - Kerosene (feat. Jericho Spencer-Champagne)"},
+		{title: "Fractures and Outlines - Kerosene (feat. Jericho Spencer-Champagne) [Single] (2020)", want: "Fractures and Outlines - Kerosene"},
 		{title: "Chasing Apparitions - As Above, So Below [Single] (2020)", want: "Chasing Apparitions - As Above, So Below"},
 		{title: "Butch Walker - American Love Story (2020)", want: "Butch Walker - American Love Story"},
 		{title: "Blacklab - Abyss (2020)", want: "Blacklab - Abyss"},
@@ -79,6 +79,31 @@ func Test_clearTitle(t *testing.T) {
 		{title: "Agriculture - Agriculture (2023)", want: "Agriculture - Agriculture"},
 		{title: "Who Will Fix Me Now? - EP", want: "Who Will Fix Me Now?"},
 		{title: "Who Will Fix Me Now - EP? - EP", want: "Who Will Fix Me Now - EP?"},
+		// iTunes suffixes
+		{title: "Whitechapel - A New Era of Corruption (Bonus Track Version)", want: "Whitechapel - A New Era of Corruption"},
+		{title: "Parkway Drive - Horizons (Deluxe Edition)", want: "Parkway Drive - Horizons"},
+		{title: "Trivium - Shogun (Special Edition)", want: "Trivium - Shogun"},
+		{title: "Architects - Holy Hell (Deluxe Version)", want: "Architects - Holy Hell"},
+		{title: "Gojira - Fortitude (Remastered)", want: "Gojira - Fortitude"},
+		{title: "Metallica - Master of Puppets [Remastered]", want: "Metallica - Master of Puppets"},
+		{title: "Spiritbox - Eternal Blue (Deluxe)", want: "Spiritbox - Eternal Blue"},
+		{title: "Knocked Loose - A Different Shade of Blue [Deluxe Edition]", want: "Knocked Loose - A Different Shade of Blue"},
+		// em-dash normalization
+		{title: "Crossfire — I Drew A Heart (2024)", want: "Crossfire - I Drew A Heart"},
+		{title: "Slow Degrade \u2013 Who Will Fix Me Now? [EP] (2024)", want: "Slow Degrade - Who Will Fix Me Now?"},
+		// from prod logs: country codes
+		{title: "Crossfire (US) - I Drew A Heart Around The Name Of Your City [EP] (2026)", want: "Crossfire - I Drew A Heart Around The Name Of Your City"},
+		// from prod logs: [Self-titled]
+		{title: "Machinae Supremacy - Machinae Supremacy [Self-titled] (2026)", want: "Machinae Supremacy - Machinae Supremacy"},
+		// from prod logs: (Remixed & Remastered YYYY)
+		{title: "Eventide - Planet Plague (Remixed & Remastered 2026)", want: "Eventide - Planet Plague"},
+		// from prod logs: iTunes (YYYY Remixed and Remastered Version) - EP [DJ Mix]
+		{title: "Planet Plague (2026 Remixed and Remastered Version) - EP [DJ Mix]", want: "Planet Plague"},
+		// from prod logs: (feat. ...) in iTunes results
+		{title: "Forced to Bleed - Forced to Bleed (feat. Jared Armitage)", want: "Forced to Bleed - Forced to Bleed"},
+		// from prod logs: - Single in iTunes results
+		{title: "My Chemical Romance - Number Three - Single", want: "My Chemical Romance - Number Three"},
+		{title: "Rob Zombie - Helter Skelter (feat. Marilyn Manson) - Single", want: "Rob Zombie - Helter Skelter"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.title, func(t *testing.T) {
@@ -173,6 +198,53 @@ func Test_levenshteinDistance(t *testing.T) {
 	}
 }
 
+func Test_shouldSkipTitle(t *testing.T) {
+	tests := []struct {
+		title string
+		want  bool
+	}{
+		{title: "Whitechapel - A New Era of Corruption (2020)", want: false},
+		{title: "Лучшие альбомы 2025 года. Итоги", want: true},
+		{title: "Evil Not Alone - Discography (2005-2026)", want: true},
+		{title: "VA - Alterportal HITS", want: true},
+		{title: "V.A. - Best Metal Collection 2025", want: true},
+		{title: "V/A - Rock Compilation", want: true},
+		{title: "Various Artists - Summer Hits 2025", want: true},
+		{title: "Best of 2025 Rock", want: true},
+		{title: "Сборник рок-хитов 2025", want: true},
+		{title: "Parkway Drive - Horizons (2020)", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.title, func(t *testing.T) {
+			if got := shouldSkipTitle(tt.title); got != tt.want {
+				t.Errorf("shouldSkipTitle() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_splitArtistAlbum(t *testing.T) {
+	tests := []struct {
+		title      string
+		wantArtist string
+		wantAlbum  string
+	}{
+		{title: "Whitechapel - A New Era of Corruption", wantArtist: "Whitechapel", wantAlbum: "A New Era of Corruption"},
+		{title: "Parkway Drive - Horizons", wantArtist: "Parkway Drive", wantAlbum: "Horizons"},
+		{title: "Single Word", wantArtist: "", wantAlbum: ""},
+		{title: "", wantArtist: "", wantAlbum: ""},
+		{title: "A - B - C", wantArtist: "A", wantAlbum: "B - C"},
+		{title: "  Artist  -  Album  ", wantArtist: "Artist", wantAlbum: "Album"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.title, func(t *testing.T) {
+			artist, album := splitArtistAlbum(tt.title)
+			assert.Equal(t, tt.wantArtist, artist)
+			assert.Equal(t, tt.wantAlbum, album)
+		})
+	}
+}
+
 func Test_findCollectionIDFromResultsByTitle(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -195,6 +267,32 @@ func Test_findCollectionIDFromResultsByTitle(t *testing.T) {
 			wantErr:  false,
 		},
 		{
+			name: "Bonus Track Version match",
+			r: itunes.Result{
+				ArtistName:     "Whitechapel",
+				CollectionName: "A New Era of Corruption (Bonus Track Version)",
+				ReleaseDate:    time.Date(2010, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   456,
+				Kind:           itunes.KindAlbum,
+			},
+			s:        "Whitechapel - A New Era of Corruption (2010)",
+			expected: "456",
+			wantErr:  false,
+		},
+		{
+			name: "em-dash title match",
+			r: itunes.Result{
+				ArtistName:     "Crossfire",
+				CollectionName: "I Drew A Heart",
+				ReleaseDate:    time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   789,
+				Kind:           itunes.KindAlbum,
+			},
+			s:        "Crossfire — I Drew A Heart (2024)",
+			expected: "789",
+			wantErr:  false,
+		},
+		{
 			name: "UPFALL - ARTIFICIAL - EP",
 			r: itunes.Result{
 				ArtistName:     "UPFALL",
@@ -205,6 +303,58 @@ func Test_findCollectionIDFromResultsByTitle(t *testing.T) {
 			},
 			s:        "Upfall - Artificial (EP) (2025)",
 			expected: "123",
+			wantErr:  false,
+		},
+		{
+			name: "country code (US) stripped for matching",
+			r: itunes.Result{
+				ArtistName:     "Crossfire",
+				CollectionName: "I Drew A Heart Around The Name Of Your City - Single",
+				ReleaseDate:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   111,
+				Kind:           itunes.KindAlbum,
+			},
+			s:        "Crossfire (US) - I Drew A Heart Around The Name Of Your City [EP] (2026)",
+			expected: "111",
+			wantErr:  false,
+		},
+		{
+			name: "feat suffix stripped from iTunes result",
+			r: itunes.Result{
+				ArtistName:     "Forced to Bleed",
+				CollectionName: "Forced to Bleed (feat. Jared Armitage)",
+				ReleaseDate:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   222,
+				Kind:           itunes.KindAlbum,
+			},
+			s:        "Forced to Bleed - Forced to Bleed (2026)",
+			expected: "222",
+			wantErr:  false,
+		},
+		{
+			name: "Remixed and Remastered Version from iTunes",
+			r: itunes.Result{
+				ArtistName:     "Eventide",
+				CollectionName: "Planet Plague (2026 Remixed and Remastered Version) - EP [DJ Mix]",
+				ReleaseDate:    time.Date(2008, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   333,
+				Kind:           itunes.KindAlbum,
+			},
+			s:        "Eventide - Planet Plague (Remixed & Remastered 2026)",
+			expected: "333",
+			wantErr:  false,
+		},
+		{
+			name: "Self-titled stripped",
+			r: itunes.Result{
+				ArtistName:     "Machinae Supremacy",
+				CollectionName: "Machinae Supremacy",
+				ReleaseDate:    time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC),
+				CollectionId:   444,
+				Kind:           itunes.KindAlbum,
+			},
+			s:        "Machinae Supremacy - Machinae Supremacy [Self-titled] (2026)",
+			expected: "444",
 			wantErr:  false,
 		},
 	}

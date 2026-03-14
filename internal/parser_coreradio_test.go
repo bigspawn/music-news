@@ -131,6 +131,47 @@ func TestExtractAfterDecode(t *testing.T) {
 	}
 }
 
+func Test_extractGetCoreradioLink(t *testing.T) {
+	tests := []struct {
+		name    string
+		rawLink string
+		want    string
+		wantErr bool
+	}{
+		{
+			name:    "valid double base64 link",
+			rawLink: "https://get.coreradio.online/?hash=YUhSMGNITTZMeTl6TG1OdmNtVnlZV1JwYnk1dmJteHBibVV2TXpaNk5sVjFTdz09",
+			want:    "https://s.coreradio.online/36z6UuK",
+		},
+		{
+			name:    "another valid hash",
+			rawLink: "https://get.coreradio.online/?hash=YUhSMGNITTZMeTl6TG1OdmNtVnlZV1JwYnk1dmJteHBibVV2VVZVM05GRTFUdz09",
+			want:    "https://s.coreradio.online/QU74Q5O",
+		},
+		{
+			name:    "no hash parameter",
+			rawLink: "https://get.coreradio.online/",
+			wantErr: true,
+		},
+		{
+			name:    "invalid base64",
+			rawLink: "https://get.coreradio.online/?hash=!!!invalid!!!",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := extractGetCoreradioLink(tt.rawLink)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 //go:embed testdata/core_radio.html
 var data []byte
 

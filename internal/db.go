@@ -11,21 +11,34 @@ import (
 )
 
 const (
+	maxNotifyAttempts = 14
+
 	driver      = "sqlite3"
 	insertQuery = `			insert into main.news(title, playlist, date_time, imageurl, downloadurl, pageurl, posted, created_at)
 							values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`
+
+	migrateNotifyRetry = `	ALTER TABLE news ADD COLUMN notify_attempts INTEGER NOT NULL DEFAULT 0`
+	migrateNextRetry   = `	ALTER TABLE news ADD COLUMN notify_next_retry TIMESTAMP`
 
 	selectNotified = `		select id, title, playlist, imageurl, date_time, downloadurl
 							from main.news
 							where not notified
 							  and title not like '%Single%'
 							  and title not like '%single%'
+							  and notify_attempts < $1
+							  and (notify_next_retry is null or notify_next_retry <= datetime('now'))
 							  and created_at > strftime('%Y-%m-%d %H:%M:%S+00:00', 'now', 'utc', '-1 months')
 							order by date_time`
 
 	updateNotified = `		update main.news
 							set notified = true
 							where id = $1`
+
+	incrementNotifyAttempts = `	update main.news
+								set notify_attempts = notify_attempts + 1,
+									notify_next_retry = datetime('now', '+' || (1 << notify_attempts) || ' hours'),
+									notified = case when notify_attempts + 1 >= 14 then true else notified end
+								where id = $1`
 
 	selectUnpublished = `	select id, title, playlist, imageurl, date_time, downloadurl, pageurl
 							from main.news
@@ -91,7 +104,23 @@ func NewStore(params StoreParams) (*Store, error) {
 	if err := params.Validate(); err != nil {
 		return nil, err
 	}
-	return &Store{StoreParams: params}, nil
+	s := &Store{StoreParams: params}
+	if err := s.migrate(); err != nil {
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
+	return s, nil
+}
+
+func (s *Store) migrate() error {
+	for _, q := range []string{migrateNotifyRetry, migrateNextRetry} {
+		if _, err := s.DB.Exec(q); err != nil {
+			if strings.Contains(err.Error(), "duplicate column name") {
+				continue
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Store) Exist(ctx context.Context, title string) (bool, error) {
@@ -132,7 +161,7 @@ func (s *Store) Insert(ctx context.Context, n News) (int, error) {
 }
 
 func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]News, error) {
-	rows, err := s.DB.QueryContext(ctx, selectNotified)
+	rows, err := s.DB.QueryContext(ctx, selectNotified, maxNotifyAttempts)
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +194,10 @@ func (s *Store) GetWithNotifyFlag(ctx context.Context) ([]News, error) {
 
 func (s *Store) UpdateNotifyFlag(ctx context.Context, item News) error {
 	return s.exec(ctx, updateNotified, item.ID)
+}
+
+func (s *Store) IncrementNotifyAttempts(ctx context.Context, id int) error {
+	return s.exec(ctx, incrementNotifyAttempts, id)
 }
 
 func (s *Store) GetUnpublished(ctx context.Context) ([]News, error) {
