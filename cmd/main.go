@@ -19,7 +19,7 @@ func main() {
 
 	_, err := maxprocs.Set(maxprocs.Logger(logger.Logf))
 	if err != nil {
-		logger.Logf("[FATAL] cant sent max proc err=%v", err)
+		logger.Logf("[WARN] cant set max proc err=%v", err)
 	}
 
 	opt := &internal.Options{}

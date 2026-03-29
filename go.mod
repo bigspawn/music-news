@@ -3,14 +3,14 @@ module github.com/bigspawn/music-news
 go 1.25.6
 
 require (
-	github.com/PuerkitoBio/goquery v1.11.0
+	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/bigspawn/go-itunes-api v0.0.3
 	github.com/bigspawn/go-odesli v0.0.4
 	github.com/disintegration/imaging v1.6.2
 	github.com/go-co-op/gocron v1.37.0
-	github.com/go-pkgz/lgr v0.12.2
+	github.com/go-pkgz/lgr v0.12.3
 	github.com/jessevdk/go-flags v1.6.1
-	github.com/mattn/go-sqlite3 v1.14.34
+	github.com/mattn/go-sqlite3 v1.14.37
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
@@ -39,7 +39,7 @@ require (
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.4 // indirect
-	golang.org/x/image v0.18.0 // indirect
+	golang.org/x/image v0.38.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect

@@ -12,3 +12,11 @@ services:
     volumes:
       - ./local:/home/db
     restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 32M
